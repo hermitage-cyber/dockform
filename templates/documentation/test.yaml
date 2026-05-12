@@ -1,0 +1,11 @@
+template: test.docx
+title: "Тестовый шаблон"
+description: "Для проверки этапа 2: чтение шаблонов с диска."
+output_filename:
+  pattern: "test_{date}.docx"
+  fields: []
+fields:
+  - name: имя
+    label: "Имя"
+    type: text
+    required: true

@@ -8,11 +8,6 @@ import type { Mode, Template } from "@/types";
 
 type Screen = "mode" | "list" | "form";
 
-const fakeTemplates: Template[] = [
-  { id: "t1", title: "Шаблон 1", description: "Описание" },
-  { id: "t2", title: "Шаблон 2", description: "Описание" },
-];
-
 const titles: Record<Mode | "none", string> = {
   pretenzii: "Dockform — Претензионная работа",
   documentation: "Dockform — Документация",
@@ -92,7 +87,6 @@ function App() {
     return (
       <TemplatesList
         mode={mode}
-        templates={fakeTemplates}
         onSelect={(t) => {
           setSelected(t);
           setScreen("form");
