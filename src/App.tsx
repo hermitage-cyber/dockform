@@ -71,9 +71,10 @@ function App() {
 
   if (!ready) return null;
 
-  if (screen === "form" && selected) {
+  if (screen === "form" && selected && mode) {
     return (
       <FormPage
+        mode={mode}
         template={selected}
         onBack={() => {
           setSelected(null);

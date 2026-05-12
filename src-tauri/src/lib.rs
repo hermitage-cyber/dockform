@@ -1,6 +1,7 @@
 mod commands;
 
 use commands::app::{get_mode, parse_mode_from_argv, AppMode};
+use commands::files::{open_in_explorer, read_template, write_file};
 use commands::templates::list_templates;
 use commands::window::{load_window_state, save_window_state};
 use tauri::Manager;
@@ -43,6 +44,7 @@ pub fn run() {
     ensure_dev_symlinks();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppMode(parse_mode_from_argv()))
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
@@ -60,6 +62,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_mode,
             list_templates,
+            read_template,
+            write_file,
+            open_in_explorer,
             save_window_state,
             load_window_state,
         ])

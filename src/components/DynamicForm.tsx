@@ -17,11 +17,12 @@ import type { FieldConfig, TemplateConfig } from "@/types";
 type Props = {
   config: TemplateConfig;
   onSubmit: (values: FormValues) => void;
+  disabled?: boolean;
 };
 
 const requiredMsg = "Обязательное поле";
 
-export function DynamicForm({ config, onSubmit }: Props) {
+export function DynamicForm({ config, onSubmit, disabled }: Props) {
   // shouldUnregister: невидимые поля автоматически выкидываются из state и
   // не валидируются. По сабмиту через handleSubmit придут только видимые.
   const {
@@ -54,7 +55,9 @@ export function DynamicForm({ config, onSubmit }: Props) {
         );
       })}
 
-      <Button type="submit">Сформировать документ</Button>
+      <Button type="submit" disabled={disabled}>
+        {disabled ? "Формируем…" : "Сформировать документ"}
+      </Button>
     </form>
   );
 }
