@@ -4,7 +4,7 @@ import { ModeSelect } from "@/pages/ModeSelect";
 import { TemplatesList } from "@/pages/TemplatesList";
 import { FormPage } from "@/pages/FormPage";
 import { getMode, saveWindowState } from "@/lib/tauri";
-import type { Mode, Template } from "@/types";
+import type { Mode, TemplateConfig } from "@/types";
 
 type Screen = "mode" | "list" | "form";
 
@@ -17,7 +17,7 @@ const titles: Record<Mode | "none", string> = {
 function App() {
   const [mode, setMode] = useState<Mode | null>(null);
   const [screen, setScreen] = useState<Screen>("mode");
-  const [selected, setSelected] = useState<Template | null>(null);
+  const [selected, setSelected] = useState<TemplateConfig | null>(null);
   const [ready, setReady] = useState(false);
   // Если режим зашит в argv (ярлык --mode=...), кнопка «К выбору режима»
   // не показывается — менять его в UI бессмысленно, всё равно перезапуск

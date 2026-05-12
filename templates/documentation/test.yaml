@@ -1,6 +1,6 @@
 template: test.docx
 title: "Тестовый шаблон"
-description: "Для проверки этапа 2: чтение шаблонов с диска."
+description: "Для проверки этапа 3: динамический рендер формы со всеми типами полей."
 output_filename:
   pattern: "test_{date}.docx"
   fields: []
@@ -9,3 +9,44 @@ fields:
     label: "Имя"
     type: text
     required: true
+
+  - name: пол
+    label: "Пол"
+    type: radio
+    options: ["Мужской", "Женский"]
+    required: true
+
+  - name: указать_отчество
+    label: "Указать отчество?"
+    type: radio
+    options: ["Да", "Нет"]
+
+  - name: отчество
+    label: "Отчество"
+    type: text
+    visible_if: "указать_отчество == 'Да'"
+
+  - name: возраст
+    label: "Возраст (полных лет)"
+    type: number
+    required: true
+
+  - name: дата_рождения
+    label: "Дата рождения"
+    type: date
+
+  - name: страна
+    label: "Страна"
+    type: dropdown
+    options: ["Россия", "Беларусь", "Казахстан"]
+    required: true
+
+  - name: указать_комментарий
+    label: "Указать комментарий?"
+    type: radio
+    options: ["Да", "Нет"]
+
+  - name: комментарий
+    label: "Комментарий"
+    type: textarea
+    visible_if: "указать_комментарий != 'Нет'"

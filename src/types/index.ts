@@ -36,5 +36,3 @@ export type TemplateConfig = {
   fields: FieldConfig[];
 };
 
-// Лёгкий тип для карточки в списке. До Этапа 2 здесь жил mock.
-export type Template = Pick<TemplateConfig, "id" | "title" | "description">;

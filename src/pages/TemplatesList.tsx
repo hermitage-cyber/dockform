@@ -3,11 +3,11 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { listTemplates } from "@/lib/tauri";
-import type { Mode, Template, TemplateConfig } from "@/types";
+import type { Mode, TemplateConfig } from "@/types";
 
 type Props = {
   mode: Mode;
-  onSelect: (template: Template) => void;
+  onSelect: (template: TemplateConfig) => void;
   onBackToModes?: () => void;
 };
 
@@ -62,7 +62,7 @@ export function TemplatesList({ mode, onSelect, onBackToModes }: Props) {
             {templates.map((t) => (
               <Card
                 key={t.id}
-                onClick={() => onSelect({ id: t.id, title: t.title, description: t.description })}
+                onClick={() => onSelect(t)}
                 className="cursor-pointer hover:bg-accent transition-colors"
               >
                 <CardContent className="p-5">

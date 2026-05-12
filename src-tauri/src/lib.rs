@@ -45,11 +45,15 @@ pub fn run() {
     tauri::Builder::default()
         .manage(AppMode(parse_mode_from_argv()))
         .setup(|app| {
-            if let Some(state) = load_window_state() {
-                if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_webview_window("main") {
+                if let Some(state) = load_window_state() {
                     let _ =
                         window.set_size(tauri::LogicalSize::new(state.width, state.height));
                 }
+                // В dev сразу открываем встроенный DevTools панелью —
+                // удобнее, чем искать шорткат, и release-сборки это не затрагивает.
+                #[cfg(debug_assertions)]
+                window.open_devtools();
             }
             Ok(())
         })
