@@ -26,6 +26,10 @@ pub struct FieldConfig {
     pub options: Option<Vec<String>>,
     #[serde(default)]
     pub visible_if: Option<String>,
+    #[serde(default)]
+    pub placeholder: Option<String>,
+    #[serde(default)]
+    pub help_text: Option<String>,
     // Поля dictionary — пригодятся на этапе 5, тащим сразу, чтобы YAML не ломались.
     #[serde(default)]
     pub source: Option<String>,

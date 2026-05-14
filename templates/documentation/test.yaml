@@ -1,6 +1,6 @@
 template: test.docx
 title: "Тестовый шаблон"
-description: "Для проверки этапа 3: динамический рендер формы со всеми типами полей."
+description: "Для проверки этапов 2–5: рендер формы, генерация .docx, dictionary."
 output_filename:
   pattern: "test_{date}.docx"
   fields: []
@@ -40,6 +40,28 @@ fields:
     type: dropdown
     options: ["Россия", "Беларусь", "Казахстан"]
     required: true
+
+  - name: зам
+    label: "Заместитель"
+    type: dictionary
+    source: deputies
+    display: "{fio} ({position})"
+    fills:
+      Фам_Имя_Отч_зама_им_пад: fio_im
+      Фам_Имя_Отч_зама_род_пад: fio_rod
+      должность_зама: position
+
+  - name: Фам_Имя_Отч_зама_им_пад
+    label: "ФИО зама (им.п.) — заполнится автоматически, можно править"
+    type: text
+
+  - name: Фам_Имя_Отч_зама_род_пад
+    label: "ФИО зама (род.п.) — заполнится автоматически, можно править"
+    type: text
+
+  - name: должность_зама
+    label: "Должность зама — заполнится автоматически, можно править"
+    type: text
 
   - name: указать_комментарий
     label: "Указать комментарий?"

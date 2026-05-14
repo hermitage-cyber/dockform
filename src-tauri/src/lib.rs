@@ -1,6 +1,8 @@
 mod commands;
 
 use commands::app::{get_mode, parse_mode_from_argv, AppMode};
+use commands::dictionaries::list_dictionaries;
+use commands::drafts::{delete_draft, ensure_drafts_dir, load_draft, save_draft};
 use commands::files::{open_in_explorer, read_template, write_file};
 use commands::templates::list_templates;
 use commands::window::{load_window_state, save_window_state};
@@ -43,6 +45,8 @@ pub fn run() {
     #[cfg(debug_assertions)]
     ensure_dev_symlinks();
 
+    ensure_drafts_dir();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppMode(parse_mode_from_argv()))
@@ -62,11 +66,15 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_mode,
             list_templates,
+            list_dictionaries,
             read_template,
             write_file,
             open_in_explorer,
             save_window_state,
             load_window_state,
+            save_draft,
+            load_draft,
+            delete_draft,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

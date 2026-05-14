@@ -17,6 +17,7 @@
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "docxtemplater": "^3.68.7",
     "lucide-react": "^1.14.0",
     "pizzip": "^3.2.0",

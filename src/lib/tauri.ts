@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Mode, TemplateConfig } from "@/types";
+import type { Dictionaries, Mode, TemplateConfig } from "@/types";
 
 export type WindowState = { width: number; height: number };
 
@@ -10,6 +10,10 @@ export async function getMode(): Promise<Mode | null> {
 
 export async function listTemplates(mode: Mode): Promise<TemplateConfig[]> {
   return await invoke<TemplateConfig[]>("list_templates", { mode });
+}
+
+export async function listDictionaries(): Promise<Dictionaries> {
+  return await invoke<Dictionaries>("list_dictionaries");
 }
 
 export async function readTemplate(mode: Mode, template: string): Promise<Uint8Array> {
@@ -31,4 +35,35 @@ export async function saveWindowState(width: number, height: number): Promise<vo
 
 export async function loadWindowState(): Promise<WindowState | null> {
   return await invoke<WindowState | null>("load_window_state");
+}
+
+export type DraftPayload = {
+  saved_at: string;
+  values: Record<string, unknown>;
+};
+
+export function draftKey(mode: Mode, templateId: string): string {
+  return `${mode}__${templateId}`;
+}
+
+export async function saveDraft(key: string, payload: DraftPayload): Promise<void> {
+  await invoke("save_draft", { key, json: JSON.stringify(payload) });
+}
+
+export async function loadDraft(key: string): Promise<DraftPayload | null> {
+  const raw = await invoke<string | null>("load_draft", { key });
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as DraftPayload;
+    if (!parsed || typeof parsed.saved_at !== "string" || typeof parsed.values !== "object") {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteDraft(key: string): Promise<void> {
+  await invoke("delete_draft", { key });
 }

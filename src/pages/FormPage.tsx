@@ -14,7 +14,7 @@ import {
 import { DynamicForm } from "@/components/DynamicForm";
 import { buildFilename } from "@/lib/filename";
 import { generateDocx } from "@/lib/generator";
-import { openInExplorer, writeFile } from "@/lib/tauri";
+import { deleteDraft, draftKey, openInExplorer, writeFile } from "@/lib/tauri";
 import type { FormValues } from "@/lib/form-evaluator";
 import type { Mode, TemplateConfig } from "@/types";
 
@@ -29,6 +29,7 @@ export function FormPage({ mode, template, onBack }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedPath, setSavedPath] = useState<string | null>(null);
+  const key = draftKey(mode, template.id);
 
   const fieldLabel = (name: string): string => {
     const f = template.fields.find((x) => x.name === name);
@@ -68,6 +69,9 @@ export function FormPage({ mode, template, onBack }: Props) {
     try {
       const bytes = await generateDocx(mode, template.template, values);
       await writeFile(dest, bytes);
+      // Удаляем черновик только после успешной записи на диск,
+      // чтобы при падении генерации работа пользователя не пропала.
+      await deleteDraft(key).catch(() => undefined);
       setSavedPath(dest);
     } catch (e) {
       setError(extractError(e));
@@ -102,7 +106,7 @@ export function FormPage({ mode, template, onBack }: Props) {
           </Alert>
         )}
 
-        <DynamicForm config={template} onSubmit={onSubmit} disabled={busy} />
+        <DynamicForm config={template} onSubmit={onSubmit} disabled={busy} draftKey={key} />
       </div>
 
       <Dialog open={savedPath !== null} onOpenChange={(open) => !open && setSavedPath(null)}>
