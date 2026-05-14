@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Button } from "@/components/ui/button";
 import { ModeSelect } from "@/pages/ModeSelect";
 import { TemplatesList } from "@/pages/TemplatesList";
 import { FormPage } from "@/pages/FormPage";
-import { getMode, saveWindowState } from "@/lib/tauri";
+import { fetchKillswitch, getMode, saveWindowState } from "@/lib/tauri";
 import type { Mode, TemplateConfig } from "@/types";
 
 type Screen = "mode" | "list" | "form";
@@ -23,6 +24,20 @@ function App() {
   // не показывается — менять его в UI бессмысленно, всё равно перезапуск
   // вернёт сюда же.
   const [modeFromArgv, setModeFromArgv] = useState(false);
+  const [blocked, setBlocked] = useState<{ message?: string } | null>(null);
+
+  // Kill switch — асинхронно, не блокирует UI. Если ответ пришёл с
+  // active:false, поверх обычного UI накрывает оверлей. До ответа
+  // приложение работает в обычном режиме (CLAUDE.md: старт ≤ 5 сек).
+  useEffect(() => {
+    fetchKillswitch()
+      .then((k) => {
+        if (k && k.active === false) {
+          setBlocked({ message: k.message });
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     getMode().then((m) => {
@@ -71,8 +86,9 @@ function App() {
 
   if (!ready) return null;
 
+  let content;
   if (screen === "form" && selected && mode) {
-    return (
+    content = (
       <FormPage
         mode={mode}
         template={selected}
@@ -82,10 +98,8 @@ function App() {
         }}
       />
     );
-  }
-
-  if (screen === "list" && mode) {
-    return (
+  } else if (screen === "list" && mode) {
+    content = (
       <TemplatesList
         mode={mode}
         onSelect={(t) => {
@@ -102,15 +116,40 @@ function App() {
         }
       />
     );
+  } else {
+    content = (
+      <ModeSelect
+        onSelect={(m) => {
+          setMode(m);
+          setScreen("list");
+        }}
+      />
+    );
   }
 
   return (
-    <ModeSelect
-      onSelect={(m) => {
-        setMode(m);
-        setScreen("list");
-      }}
-    />
+    <>
+      {content}
+      {blocked && <BlockedOverlay message={blocked.message} />}
+    </>
+  );
+}
+
+/// Полноэкранный оверлей, который накрывает любой UI. Закрывается только
+/// через закрытие самого приложения — без ESC, без клика по фону.
+function BlockedOverlay({ message }: { message?: string }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+      <div className="max-w-md space-y-4 rounded-lg border bg-background p-6">
+        <h2 className="text-lg font-semibold">Приложение временно недоступно</h2>
+        <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+          {message ?? "Доступ к приложению временно ограничен администратором."}
+        </p>
+        <Button className="w-full" onClick={() => getCurrentWindow().close()}>
+          Закрыть
+        </Button>
+      </div>
+    </div>
   );
 }
 

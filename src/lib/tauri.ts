@@ -67,3 +67,14 @@ export async function loadDraft(key: string): Promise<DraftPayload | null> {
 export async function deleteDraft(key: string): Promise<void> {
   await invoke("delete_draft", { key });
 }
+
+export type Killswitch = {
+  /// `false` → блокировать запуск. Семантика по plan.md 6.1.
+  active: boolean;
+  message?: string;
+};
+
+/// `null` — ни сети, ни кеша. Фронт работает в обычном режиме.
+export async function fetchKillswitch(): Promise<Killswitch | null> {
+  return await invoke<Killswitch | null>("fetch_killswitch");
+}

@@ -4,6 +4,7 @@ use commands::app::{get_mode, parse_mode_from_argv, AppMode};
 use commands::dictionaries::list_dictionaries;
 use commands::drafts::{delete_draft, ensure_drafts_dir, load_draft, save_draft};
 use commands::files::{open_in_explorer, read_template, write_file};
+use commands::network::fetch_killswitch;
 use commands::templates::list_templates;
 use commands::window::{load_window_state, save_window_state};
 use tauri::Manager;
@@ -75,6 +76,7 @@ pub fn run() {
             save_draft,
             load_draft,
             delete_draft,
+            fetch_killswitch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
