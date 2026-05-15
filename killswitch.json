@@ -1,4 +1,4 @@
 {
-  "active": false,
-  "message": "Тестовая блокировка kill switch. Это временно, безопасно закрыть приложение."
+  "active": true,
+  "message": ""
 }
