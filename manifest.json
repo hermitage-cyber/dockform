@@ -1,4 +1,11 @@
 {
-  "templates": {},
-  "dictionaries": {}
+  "dictionaries": {
+    "deputies.json": "6fdf979a6dc9eb571edd45fc97302ebfeb70e3d65025143d3ade36f0fdae1177"
+  },
+  "templates": {
+    "documentation/44_tovar_smp_ktru.docx": "31e49d78d394eb63edfaa4148b88e93f2e29c5d69b33a5d6d7f055a7eb273b89",
+    "documentation/44_tovar_smp_ktru.yaml": "03fd9620354122e3945b4ed92ebf077151aec4b1180f811127daf367cfd9dc68",
+    "documentation/test.docx": "6e81c952417132e43570577f50b4a6a2ed083dd003c4ee7b03be8cd286533478",
+    "documentation/test.yaml": "d59600755f8770cb6e38a340c4e565e8f1188c0233b228795133ceaa412ec6e9"
+  }
 }

@@ -78,3 +78,15 @@ export type Killswitch = {
 export async function fetchKillswitch(): Promise<Killswitch | null> {
   return await invoke<Killswitch | null>("fetch_killswitch");
 }
+
+export type UpdateReport = {
+  updated: string[];
+  removed: string[];
+  failed: string[];
+};
+
+/// Скачивает manifest.json с GitHub и синхронизирует templates/ + dictionaries/.
+/// Сетевые ошибки не пробрасываются: на их месте — пустой отчёт.
+export async function updateTemplates(): Promise<UpdateReport> {
+  return await invoke<UpdateReport>("update_templates");
+}

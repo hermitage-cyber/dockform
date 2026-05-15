@@ -9,6 +9,9 @@ type Props = {
   mode: Mode;
   onSelect: (template: TemplateConfig) => void;
   onBackToModes?: () => void;
+  /// Меняется после успешного обновления шаблонов с GitHub — триггерит
+  /// повторный listTemplates() с диска.
+  refreshNonce?: number;
 };
 
 const modeLabels: Record<Mode, string> = {
@@ -16,17 +19,16 @@ const modeLabels: Record<Mode, string> = {
   documentation: "Документация",
 };
 
-export function TemplatesList({ mode, onSelect, onBackToModes }: Props) {
+export function TemplatesList({ mode, onSelect, onBackToModes, refreshNonce }: Props) {
   const [templates, setTemplates] = useState<TemplateConfig[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setTemplates(null);
     setError(null);
     listTemplates(mode)
       .then(setTemplates)
       .catch((e) => setError(String(e)));
-  }, [mode]);
+  }, [mode, refreshNonce]);
 
   return (
     <div className="min-h-screen p-8">

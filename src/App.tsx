@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ModeSelect } from "@/pages/ModeSelect";
 import { TemplatesList } from "@/pages/TemplatesList";
 import { FormPage } from "@/pages/FormPage";
-import { fetchKillswitch, getMode, saveWindowState } from "@/lib/tauri";
+import { fetchKillswitch, getMode, saveWindowState, updateTemplates } from "@/lib/tauri";
 import type { Mode, TemplateConfig } from "@/types";
 
 type Screen = "mode" | "list" | "form";
@@ -25,6 +25,9 @@ function App() {
   // вернёт сюда же.
   const [modeFromArgv, setModeFromArgv] = useState(false);
   const [blocked, setBlocked] = useState<{ message?: string } | null>(null);
+  // Инкрементируется после успешного обновления шаблонов, чтобы TemplatesList
+  // перечитал список с диска.
+  const [templatesNonce, setTemplatesNonce] = useState(0);
 
   // Kill switch — асинхронно, не блокирует UI. Если ответ пришёл с
   // active:false, поверх обычного UI накрывает оверлей. До ответа
@@ -37,6 +40,24 @@ function App() {
         }
       })
       .catch(() => undefined);
+  }, []);
+
+  // Обновление шаблонов с GitHub — тоже фоновое, не блокирует старт.
+  // При успешных изменениях бьём nonce → TemplatesList переподтягивает список.
+  // Если пользователь к моменту завершения уже в форме, конкретный экран
+  // не дёргаем: его данные уже в JS-памяти, файлы перечитаются при возврате к
+  // списку и следующем открытии формы.
+  useEffect(() => {
+    updateTemplates()
+      .then((r) => {
+        if (r.updated.length > 0 || r.removed.length > 0) {
+          setTemplatesNonce((n) => n + 1);
+        }
+        if (r.failed.length > 0) {
+          console.warn("[updater] не удалось обновить:", r.failed);
+        }
+      })
+      .catch((e) => console.error("[updater] ошибка:", e));
   }, []);
 
   useEffect(() => {
@@ -102,6 +123,7 @@ function App() {
     content = (
       <TemplatesList
         mode={mode}
+        refreshNonce={templatesNonce}
         onSelect={(t) => {
           setSelected(t);
           setScreen("form");
