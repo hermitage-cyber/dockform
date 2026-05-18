@@ -1,5 +1,7 @@
 import type { CalculatorDef, CalculatorInputs, CalculatorOutputs } from "./types";
+import { deliveryOverdue } from "./delivery-overdue";
 import { penalty44FzPart6 } from "./penalty-44fz-part6";
+import { penaltyContractDailyPercent } from "./penalty-contract-daily-percent";
 
 /**
  * Реестр калькуляторов. Универсальные и специфичные под шаблон лежат здесь
@@ -9,7 +11,9 @@ import { penalty44FzPart6 } from "./penalty-44fz-part6";
  * импортнуть и зарегистрировать ниже.
  */
 export const CALCULATORS: Record<string, CalculatorDef> = {
+  [deliveryOverdue.id]: deliveryOverdue,
   [penalty44FzPart6.id]: penalty44FzPart6,
+  [penaltyContractDailyPercent.id]: penaltyContractDailyPercent,
 };
 
 /**

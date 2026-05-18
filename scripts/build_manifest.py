@@ -29,8 +29,10 @@ def sha256(path: Path) -> str:
 def collect(base: Path) -> dict[str, str]:
     """Собирает {relative_path: sha256} для всех файлов в base, рекурсивно.
 
-    Пропускает скрытые файлы (.gitkeep, .DS_Store, …) — они мусор с точки зрения
-    распространяемых артефактов и не должны попадать к пользователям через updater.
+    Пропускает:
+      - скрытые файлы (.gitkeep, .DS_Store, …) — мусор с точки зрения артефактов;
+      - временные блокировки Word `~$*.docx`/`~$*.doc` — они существуют, пока
+        у юриста открыт документ, и их хеши не должны уезжать к пользователям.
     """
     out: dict[str, str] = {}
     if not base.exists():
@@ -38,7 +40,10 @@ def collect(base: Path) -> dict[str, str]:
     for p in sorted(base.rglob("*")):
         if not p.is_file():
             continue
-        if any(part.startswith(".") for part in p.relative_to(base).parts):
+        rel_parts = p.relative_to(base).parts
+        if any(part.startswith(".") for part in rel_parts):
+            continue
+        if any(part.startswith("~$") for part in rel_parts):
             continue
         out[p.relative_to(base).as_posix()] = sha256(p)
     return out

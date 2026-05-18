@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CalculatorField } from "@/components/CalculatorField";
+import { DecimalInput } from "@/components/DecimalInput";
 import { DictionaryField } from "@/components/DictionaryField";
 import { NumberAmountWords } from "@/components/NumberAmountWords";
 import { evaluateVisibility, type FormValues } from "@/lib/form-evaluator";
@@ -251,16 +252,11 @@ function renderField(
 
     case "number":
       return (
-        <Input
-          id={f.name}
-          type="number"
+        <DecimalInput
+          name={f.name}
+          control={control}
           placeholder={f.placeholder}
-          {...register(f.name, {
-            ...rules,
-            valueAsNumber: true,
-            validate: (v) =>
-              v === undefined || v === null || v === "" || !Number.isNaN(v) || "Введите число",
-          })}
+          rules={rules}
         />
       );
 

@@ -12,6 +12,7 @@ pub enum FieldType {
     Dropdown,
     Dictionary,
     Date,
+    Calculator,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -37,6 +38,16 @@ pub struct FieldConfig {
     pub display: Option<String>,
     #[serde(default)]
     pub fills: Option<BTreeMap<String, String>>,
+    // Поля calculator — этап 7. См. src/lib/calculators/.
+    #[serde(default)]
+    pub calculator: Option<String>,
+    #[serde(default)]
+    pub inputs: Option<BTreeMap<String, String>>,
+    #[serde(default)]
+    pub outputs: Option<BTreeMap<String, String>>,
+    // text_output — этап 7.5: парная переменная-пропись для type:number.
+    #[serde(default)]
+    pub text_output: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

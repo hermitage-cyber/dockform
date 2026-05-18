@@ -31,3 +31,6 @@ output/
 *.njsproj
 *.sln
 *.sw?
+
+# Word lock-файлы (создаются, пока документ открыт в Word)
+~$*
