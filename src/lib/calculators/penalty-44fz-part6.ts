@@ -1,3 +1,4 @@
+import { formatRubAmount } from "@/lib/format-ru";
 import type { CalculatorDef } from "./types";
 
 /**
@@ -29,19 +30,16 @@ export const penalty44FzPart6: CalculatorDef = {
     const rounded = Math.round(penalty * 100) / 100;
 
     const formula =
-      `${formatRub(sum)} × ${days} дн. × ${formatRate(rate)}% ÷ 300 = ` +
-      `${formatRub(rounded)}`;
+      `${formatRubAmount(sum)} ₽ × ${days} дн. × ${formatRate(rate)} % ÷ 300 = ` +
+      `${formatRubAmount(rounded)} ₽`;
 
     return {
-      сумма_неустойки: rounded,
-      расчёт_подробно: formula,
+      // Денежный выход — строка в русской локали (см. CLAUDE.md).
+      "сумма_неустойки": formatRubAmount(rounded),
+      "расчёт_подробно": formula,
     };
   },
 };
-
-function formatRub(n: number): string {
-  return `${n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽`;
-}
 
 function formatRate(n: number): string {
   return n.toLocaleString("ru-RU", { maximumFractionDigits: 4 });

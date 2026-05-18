@@ -1,4 +1,5 @@
 import { amountToWords } from "@/lib/amount-to-words";
+import { formatRubAmount } from "@/lib/format-ru";
 import type { CalculatorDef } from "./types";
 
 /**
@@ -29,8 +30,9 @@ export const penaltyContractDailyPercent: CalculatorDef = {
     const total = Math.round(perDay * days * 100) / 100;
 
     return {
-      "пеня_в_день": perDay,
-      "сумма_неустойки": total,
+      // Денежные выходы — строки в русской локали (см. CLAUDE.md, конвенции).
+      "пеня_в_день": formatRubAmount(perDay),
+      "сумма_неустойки": formatRubAmount(total),
       "сумма_неустойки_прописью": amountToWords(total),
     };
   },

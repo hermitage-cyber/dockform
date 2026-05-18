@@ -1,3 +1,4 @@
+import { formatRuDate } from "@/lib/format-ru";
 import { numberToWords } from "@/lib/number-to-words";
 import type { CalculatorDef } from "./types";
 
@@ -59,9 +60,4 @@ function addDays(d: Date, n: number): Date {
   const r = new Date(d.getTime());
   r.setUTCDate(r.getUTCDate() + Math.floor(n));
   return r;
-}
-
-function formatRuDate(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
 }
