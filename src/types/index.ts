@@ -7,7 +7,8 @@ export type FieldType =
   | "radio"
   | "dropdown"
   | "dictionary"
-  | "date";
+  | "date"
+  | "calculator";
 
 export type FieldConfig = {
   name: string;
@@ -22,6 +23,15 @@ export type FieldConfig = {
   source?: string;
   display?: string;
   fills?: Record<string, string>;
+  // Поля calculator — этап 7. См. src/lib/calculators/.
+  // inputs:  имя_входа_калькулятора → имя_поля_формы (откуда взять значение).
+  // outputs: имя_выхода_калькулятора → имя_переменной_для_docx (куда положить).
+  calculator?: string;
+  inputs?: Record<string, string>;
+  outputs?: Record<string, string>;
+  // text_output — этап 7.5. Применим к type: number.
+  // Имя переменной, в которую автоматически записывается значение прописью.
+  text_output?: string;
 };
 
 export type OutputFilename = {

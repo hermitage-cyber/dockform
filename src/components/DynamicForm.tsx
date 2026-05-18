@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { CalculatorField } from "@/components/CalculatorField";
 import { DictionaryField } from "@/components/DictionaryField";
 import { evaluateVisibility, type FormValues } from "@/lib/form-evaluator";
 import {
@@ -173,6 +174,17 @@ export function DynamicForm({ config, onSubmit, disabled, draftKey }: Props) {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {config.fields.map((f) => {
           if (!evaluateVisibility(f.visible_if, values)) return null;
+
+          if (f.type === "calculator") {
+            return (
+              <div key={f.name} className="space-y-2">
+                <CalculatorField field={f} control={control} setValue={setValue} />
+                {f.help_text && (
+                  <p className="text-sm text-muted-foreground">{f.help_text}</p>
+                )}
+              </div>
+            );
+          }
 
           const err = errors[f.name]?.message as string | undefined;
 
