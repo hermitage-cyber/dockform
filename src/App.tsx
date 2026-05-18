@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 import { Button } from "@/components/ui/button";
+import { UpdaterPrompt } from "@/components/UpdaterPrompt";
 import { ModeSelect } from "@/pages/ModeSelect";
 import { TemplatesList } from "@/pages/TemplatesList";
 import { FormPage } from "@/pages/FormPage";
@@ -28,6 +30,7 @@ function App() {
   // Инкрементируется после успешного обновления шаблонов, чтобы TemplatesList
   // перечитал список с диска.
   const [templatesNonce, setTemplatesNonce] = useState(0);
+  const [appUpdate, setAppUpdate] = useState<Update | null>(null);
 
   // Kill switch — асинхронно, не блокирует UI. Если ответ пришёл с
   // active:false, поверх обычного UI накрывает оверлей. До ответа
@@ -42,22 +45,40 @@ function App() {
       .catch(() => undefined);
   }, []);
 
-  // Обновление шаблонов с GitHub — тоже фоновое, не блокирует старт.
+  // Обновление шаблонов с GitHub — фоновое, не блокирует старт.
   // При успешных изменениях бьём nonce → TemplatesList переподтягивает список.
   // Если пользователь к моменту завершения уже в форме, конкретный экран
   // не дёргаем: его данные уже в JS-памяти, файлы перечитаются при возврате к
   // списку и следующем открытии формы.
+  // Сразу после — проверка обновления самого приложения (plan.md 6.3).
   useEffect(() => {
-    updateTemplates()
-      .then((r) => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await updateTemplates();
+        if (cancelled) return;
         if (r.updated.length > 0 || r.removed.length > 0) {
           setTemplatesNonce((n) => n + 1);
         }
         if (r.failed.length > 0) {
-          console.warn("[updater] не удалось обновить:", r.failed);
+          console.warn("[templates] не удалось обновить:", r.failed);
         }
-      })
-      .catch((e) => console.error("[updater] ошибка:", e));
+      } catch (e) {
+        console.error("[templates] ошибка:", e);
+      }
+
+      try {
+        const upd = await check();
+        if (cancelled) return;
+        if (upd) setAppUpdate(upd);
+      } catch (e) {
+        // Нет интернета, заблочен GitHub, ещё не настроен pubkey — не валим UI.
+        console.warn("[updater] check:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -152,6 +173,9 @@ function App() {
   return (
     <>
       {content}
+      {appUpdate && !blocked && (
+        <UpdaterPrompt update={appUpdate} onDismiss={() => setAppUpdate(null)} />
+      )}
       {blocked && <BlockedOverlay message={blocked.message} />}
     </>
   );
