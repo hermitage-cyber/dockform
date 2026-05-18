@@ -15,6 +15,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { CalculatorField } from "@/components/CalculatorField";
 import { DictionaryField } from "@/components/DictionaryField";
+import { NumberAmountWords } from "@/components/NumberAmountWords";
 import { evaluateVisibility, type FormValues } from "@/lib/form-evaluator";
 import {
   deleteDraft as deleteDraftApi,
@@ -195,6 +196,14 @@ export function DynamicForm({ config, onSubmit, disabled, draftKey }: Props) {
                 {f.required && <span className="text-destructive ml-1">*</span>}
               </Label>
               {renderField(f, register, control, dictionaries, fillField)}
+              {f.type === "number" && f.text_output && (
+                <NumberAmountWords
+                  sourceName={f.name}
+                  targetName={f.text_output}
+                  control={control}
+                  setValue={setValue}
+                />
+              )}
               {f.help_text && <p className="text-sm text-muted-foreground">{f.help_text}</p>}
               {err && <p className="text-sm text-destructive">{err}</p>}
             </div>
