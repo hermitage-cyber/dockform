@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { DynamicForm } from "@/components/DynamicForm";
 import { buildFilename } from "@/lib/filename";
+import { formatValuesForDocx } from "@/lib/format-ru";
 import { generateDocx } from "@/lib/generator";
 import { deleteDraft, draftKey, openInExplorer, writeFile } from "@/lib/tauri";
 import type { FormValues } from "@/lib/form-evaluator";
@@ -67,7 +68,8 @@ export function FormPage({ mode, template, onBack }: Props) {
     // 3. Генерация и запись.
     setBusy(true);
     try {
-      const bytes = await generateDocx(mode, template.template, values);
+      const docxValues = formatValuesForDocx(template, values);
+      const bytes = await generateDocx(mode, template.template, docxValues);
       await writeFile(dest, bytes);
       // Удаляем черновик только после успешной записи на диск,
       // чтобы при падении генерации работа пользователя не пропала.

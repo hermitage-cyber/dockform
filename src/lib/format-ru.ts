@@ -1,8 +1,12 @@
 // Форматирование чисел и дат под русскую юридическую локаль.
 // См. CLAUDE.md, секция «Конвенции» — даты «дд.мм.гггг», суммы «1 234,56».
-// Используется калькуляторами при формировании выходов, идущих в .docx.
+// Используется и калькуляторами (когда они сами формируют выход для .docx),
+// и формой через formatValuesForDocx перед вызовом docxtemplater.
 
-/// Денежная сумма с двумя знаками после запятой: 1234.5 → "1 234,50".
+import type { TemplateConfig } from "@/types";
+
+/// Денежная сумма с двумя знаками после запятой: 1234.5 → "1 234,50"
+/// (разделитель тысяч — неразрывный пробел U+00A0).
 export function formatRubAmount(n: number): string {
   return n.toLocaleString("ru-RU", {
     minimumFractionDigits: 2,
@@ -10,8 +14,41 @@ export function formatRubAmount(n: number): string {
   });
 }
 
-/// Дата в формате дд.мм.гггг (по UTC, чтобы не уезжать по таймзоне).
+/// Дата из объекта Date в формате дд.мм.гггг (по UTC, чтобы не уезжать
+/// по таймзоне).
 export function formatRuDate(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
+}
+
+/// ISO-дата (`YYYY-MM-DD`, как её хранит HTML input type=date и react-hook-form)
+/// → строка дд.мм.гггг. Невалидный ввод возвращается как есть.
+export function isoDateToRu(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  return `${m[3]}.${m[2]}.${m[1]}`;
+}
+
+/// Преобразует значения формы перед подстановкой в .docx согласно
+/// конвенции локали:
+///   - поля type:date     →  дд.мм.гггг
+///
+/// Калькуляторы свои выходы форматируют сами (см. format-ru), здесь
+/// они не трогаются.
+///
+/// Возвращает новый объект, исходный не мутирует.
+export function formatValuesForDocx(
+  template: TemplateConfig,
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...values };
+  for (const field of template.fields) {
+    if (field.type === "date") {
+      const v = out[field.name];
+      if (typeof v === "string" && v !== "") {
+        out[field.name] = isoDateToRu(v);
+      }
+    }
+  }
+  return out;
 }
