@@ -1,15 +1,20 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Dictionaries, Mode, TemplateConfig } from "@/types";
+import type { Dictionaries, Mode, TemplateConfig, WizardConfig } from "@/types";
 
 export type WindowState = { width: number; height: number };
+
+export type ListTemplatesResult = {
+  templates: TemplateConfig[];
+  wizard: WizardConfig | null;
+};
 
 export async function getMode(): Promise<Mode | null> {
   const raw = await invoke<string | null>("get_mode");
   return raw === "pretenzii" || raw === "documentation" ? raw : null;
 }
 
-export async function listTemplates(mode: Mode): Promise<TemplateConfig[]> {
-  return await invoke<TemplateConfig[]>("list_templates", { mode });
+export async function listTemplates(mode: Mode): Promise<ListTemplatesResult> {
+  return await invoke<ListTemplatesResult>("list_templates", { mode });
 }
 
 export async function listDictionaries(): Promise<Dictionaries> {

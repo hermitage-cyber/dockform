@@ -49,5 +49,15 @@ export type TemplateConfig = {
   description?: string;
   output_filename: OutputFilename;
   fields: FieldConfig[];
+  // Теги для анкеты-навигатора (этап 8). Ключи — оси анкеты (_wizard.yaml),
+  // значения — выбранные варианты ответов. Только для режима «претензии».
+  tags?: Record<string, string | number>;
 };
+
+export type {
+  WizardAnswers,
+  WizardConfig,
+  WizardOption,
+  WizardQuestion,
+} from "./wizard";
 

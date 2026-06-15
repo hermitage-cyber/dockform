@@ -26,7 +26,7 @@ export function TemplatesList({ mode, onSelect, onBackToModes, refreshNonce }: P
   useEffect(() => {
     setError(null);
     listTemplates(mode)
-      .then(setTemplates)
+      .then((r) => setTemplates(r.templates))
       .catch((e) => setError(String(e)));
   }, [mode, refreshNonce]);
 
