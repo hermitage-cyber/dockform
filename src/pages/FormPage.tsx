@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowLeft, FolderOpen } from "lucide-react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { DynamicForm } from "@/components/DynamicForm";
 import { buildFilename } from "@/lib/filename";
+import { validateTemplate } from "@/lib/template-validator";
 import { formatValuesForDocx } from "@/lib/format-ru";
 import { generateDocx } from "@/lib/generator";
 import { deleteDraft, draftKey, openInExplorer, writeFile } from "@/lib/tauri";
@@ -31,6 +32,11 @@ export function FormPage({ mode, template, onBack }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [savedPath, setSavedPath] = useState<string | null>(null);
   const key = draftKey(mode, template.id);
+
+  // Статическая проверка конфига при загрузке (этап 7.4): несогласованный
+  // калькулятор / text_output блокирует форму понятной ошибкой, а не молча
+  // ломается на рантайме.
+  const configErrors = useMemo(() => validateTemplate(template), [template]);
 
   const fieldLabel = (name: string): string => {
     const f = template.fields.find((x) => x.name === name);
@@ -108,7 +114,20 @@ export function FormPage({ mode, template, onBack }: Props) {
           </Alert>
         )}
 
-        <DynamicForm config={template} onSubmit={onSubmit} disabled={busy} draftKey={key} />
+        {configErrors.length > 0 ? (
+          <Alert variant="destructive">
+            <AlertTitle>Шаблон настроен некорректно</AlertTitle>
+            <AlertDescription>
+              <ul className="list-disc pl-5 space-y-1">
+                {configErrors.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <DynamicForm config={template} onSubmit={onSubmit} disabled={busy} draftKey={key} />
+        )}
       </div>
 
       <Dialog open={savedPath !== null} onOpenChange={(open) => !open && setSavedPath(null)}>
