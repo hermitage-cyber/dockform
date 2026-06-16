@@ -75,6 +75,48 @@ describe("validateTemplate — калькуляторы", () => {
   });
 });
 
+describe("validateTemplate — extra_templates (8.8)", () => {
+  const base = (extra: TemplateConfig["extra_templates"]): TemplateConfig => ({
+    ...makeTemplate([]),
+    template: "основной.docx",
+    extra_templates: extra,
+  });
+
+  it("корректные доп. документы — ок", () => {
+    const errors = validateTemplate(
+      base([
+        { template: "служебка1.docx", output_filename: { pattern: "с1.docx" } },
+        { template: "служебка2.docx", output_filename: { pattern: "с2.docx" } },
+      ]),
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it("расширение не .docx → ошибка", () => {
+    const errors = validateTemplate(
+      base([{ template: "служебка.pdf", output_filename: { pattern: "с.docx" } }]),
+    );
+    expect(errors.some((e) => /должен иметь расширение \.docx/.test(e))).toBe(true);
+  });
+
+  it("дубль имени среди доп. документов → ошибка", () => {
+    const errors = validateTemplate(
+      base([
+        { template: "служебка.docx", output_filename: { pattern: "a.docx" } },
+        { template: "служебка.docx", output_filename: { pattern: "b.docx" } },
+      ]),
+    );
+    expect(errors.some((e) => /указан дважды/.test(e))).toBe(true);
+  });
+
+  it("совпадение с основным → ошибка", () => {
+    const errors = validateTemplate(
+      base([{ template: "основной.docx", output_filename: { pattern: "x.docx" } }]),
+    );
+    expect(errors.some((e) => /указан дважды.*совпадает с основным/.test(e))).toBe(true);
+  });
+});
+
 describe("validateTemplate — text_output", () => {
   const numberField: FieldConfig = {
     name: "сумма_контракта",
@@ -85,6 +127,12 @@ describe("validateTemplate — text_output", () => {
 
   it("text_output у числового поля без конфликтов — ок", () => {
     expect(validateTemplate(makeTemplate([numberField]))).toEqual([]);
+  });
+
+  it("text_output: null (из Rust) — поле игнорируется, не ошибка", () => {
+    // Rust сериализует пустой Option как null, а не как отсутствие ключа.
+    const field = { name: "кому", label: "Кому", type: "textarea", text_output: null } as unknown as FieldConfig;
+    expect(validateTemplate(makeTemplate([field]))).toEqual([]);
   });
 
   it("text_output не на number → ошибка", () => {

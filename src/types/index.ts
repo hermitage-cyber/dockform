@@ -39,6 +39,13 @@ export type OutputFilename = {
   fields: string[];
 };
 
+// Дополнительный документ, генерируемый из той же формы (этап 8.8).
+// Переменные общие со всеми документами; код генератора расширять не нужно.
+export type ExtraTemplate = {
+  template: string; // имя .docx рядом с основным
+  output_filename: { pattern: string; fields?: string[] };
+};
+
 export type DictionaryRecord = Record<string, string>;
 export type Dictionaries = Record<string, DictionaryRecord[]>;
 
@@ -52,6 +59,8 @@ export type TemplateConfig = {
   // Теги для анкеты-навигатора (этап 8). Ключи — оси анкеты (_wizard.yaml),
   // значения — выбранные варианты ответов. Только для режима «претензии».
   tags?: Record<string, string | number>;
+  // Дополнительные документы из той же формы (этап 8.8).
+  extra_templates?: ExtraTemplate[];
 };
 
 export type {

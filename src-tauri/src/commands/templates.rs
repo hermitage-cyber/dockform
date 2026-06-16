@@ -57,6 +57,13 @@ pub struct OutputFilename {
     pub fields: Vec<String>,
 }
 
+/// Дополнительный документ из той же формы (этап 8.8).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ExtraTemplate {
+    pub template: String,
+    pub output_filename: OutputFilename,
+}
+
 /// Значение тега/ответа анкеты: строка («аукцион») или число (44). Untagged —
 /// сериализуется во фронт как обычный JSON string/number.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -106,6 +113,9 @@ pub struct TemplateConfig {
     /// Теги для анкеты-навигатора (этап 8). Только у шаблонов претензий.
     #[serde(default)]
     pub tags: Option<BTreeMap<String, TagValue>>,
+    /// Дополнительные документы из той же формы (этап 8.8).
+    #[serde(default)]
+    pub extra_templates: Option<Vec<ExtraTemplate>>,
     /// Заполняется Rust'ом: ID шаблона (= имя yaml без расширения). На фронте используется как ключ.
     #[serde(default)]
     pub id: String,
@@ -176,6 +186,20 @@ pub fn list_templates(mode: String) -> Result<ListTemplatesResult, String> {
                 docx_path.display()
             );
             continue;
+        }
+
+        // Этап 8.8: дополнительные документы должны существовать в той же папке.
+        // Если хоть одного нет — шаблон пропускаем (как и при отсутствии основного).
+        if let Some(extras) = &config.extra_templates {
+            let missing = extras.iter().find(|e| !dir.join(&e.template).is_file());
+            if let Some(e) = missing {
+                eprintln!(
+                    "[list_templates] для {} не найден доп. документ {}",
+                    path.display(),
+                    e.template
+                );
+                continue;
+            }
         }
 
         config.id = id;

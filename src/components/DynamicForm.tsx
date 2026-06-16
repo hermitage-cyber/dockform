@@ -33,12 +33,14 @@ type Props = {
   disabled?: boolean;
   /// Если задан — включается автосохранение черновика и баннер восстановления.
   draftKey?: string;
+  /// Подпись кнопки отправки (по умолчанию «Сформировать документ»).
+  submitLabel?: string;
 };
 
 const requiredMsg = "Обязательное поле";
 const DEBOUNCE_MS = 500;
 
-export function DynamicForm({ config, onSubmit, disabled, draftKey }: Props) {
+export function DynamicForm({ config, onSubmit, disabled, draftKey, submitLabel }: Props) {
   const {
     register,
     handleSubmit,
@@ -212,7 +214,7 @@ export function DynamicForm({ config, onSubmit, disabled, draftKey }: Props) {
         })}
 
         <Button type="submit" disabled={disabled || draftFound !== null}>
-          {disabled ? "Формируем…" : "Сформировать документ"}
+          {disabled ? "Формируем…" : (submitLabel ?? "Сформировать документ")}
         </Button>
       </form>
     </>

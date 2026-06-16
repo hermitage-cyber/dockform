@@ -107,6 +107,9 @@ npm run tauri dev -- -- -- --mode=documentation
 - **Сетевые запросы** → в Rust (`commands/network.rs`). JS дергает Tauri command, не fetch напрямую.
 - **Новый калькулятор** → `src/lib/calculators/<id>.ts` (экспорт `CalculatorDef`), регистрация в `src/lib/calculators/index.ts`, юнит-тест рядом (`<id>.test.ts`). YAML-шаблоны ссылаются по `id`. Универсальные и специфичные — в одном реестре, без иерархии.
 - **Сумма прописью у нового шаблона** → ставим `text_output: <имя_прописью>` у `type: number` в YAML и используем `{<имя_прописью>}` в `.docx`. Кода писать не нужно — функция `src/lib/amount-to-words.ts` уже подключена.
+- **Новый шаблон претензий** → `templates/pretenzii/<имя>.docx` + `.yaml` с блоком `tags:` (оси из `_wizard.yaml`). При необходимости расширить варианты ответов в `templates/pretenzii/_wizard.yaml`. Логика анкеты — `src/lib/wizard-evaluator.ts`, валидатор — `src/lib/wizard-validator.ts`, экран — `src/pages/WizardPage.tsx`.
+- **Изменение структуры анкеты претензий** → правки в `templates/pretenzii/_wizard.yaml`; добавление новой оси требует дописать тег во все существующие шаблоны претензий (иначе валидатор заблокирует старт).
+- **Несколько документов из одной формы** → блок `extra_templates:` в YAML основного шаблона (доп. `.docx` в той же папке). Код генератора расширять не нужно — связку собирает `generateBundle` в `src/lib/generator.ts`.
 
 ## Конвенции
 

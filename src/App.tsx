@@ -6,10 +6,19 @@ import { UpdaterPrompt } from "@/components/UpdaterPrompt";
 import { ModeSelect } from "@/pages/ModeSelect";
 import { TemplatesList } from "@/pages/TemplatesList";
 import { FormPage } from "@/pages/FormPage";
-import { fetchKillswitch, getMode, saveWindowState, updateTemplates } from "@/lib/tauri";
-import type { Mode, TemplateConfig } from "@/types";
+import { WizardPage } from "@/pages/WizardPage";
+import { InDevelopmentPage } from "@/pages/InDevelopmentPage";
+import {
+  fetchKillswitch,
+  getMode,
+  listTemplates,
+  saveWindowState,
+  updateTemplates,
+} from "@/lib/tauri";
+import { validateWizard } from "@/lib/wizard-validator";
+import type { Mode, TemplateConfig, WizardAnswers, WizardConfig } from "@/types";
 
-type Screen = "mode" | "list" | "form";
+type Screen = "mode" | "list" | "wizard" | "indev" | "form";
 
 const titles: Record<Mode | "none", string> = {
   pretenzii: "Dockform — Претензионная работа",
@@ -31,6 +40,28 @@ function App() {
   // перечитал список с диска.
   const [templatesNonce, setTemplatesNonce] = useState(0);
   const [appUpdate, setAppUpdate] = useState<Update | null>(null);
+
+  // Данные анкеты режима «претензии» (этап 8). Грузятся при входе в режим.
+  const [wizard, setWizard] = useState<WizardConfig | null>(null);
+  const [pretenziiTemplates, setPretenziiTemplates] = useState<TemplateConfig[]>([]);
+  const [wizardAnswers, setWizardAnswers] = useState<WizardAnswers>({});
+  // Сброс состояния WizardPage при «начать заново» — меняем key.
+  const [wizardKey, setWizardKey] = useState(0);
+  // Ошибки валидации анкеты блокируют работу (кривая конфигурация).
+  const [wizardConfigError, setWizardConfigError] = useState<string[] | null>(null);
+
+  // Переход к началу выбора шаблона для режима: претензии → анкета,
+  // документация → список.
+  const goToModeStart = (m: Mode) => {
+    setSelected(null);
+    setScreen(m === "pretenzii" ? "wizard" : "list");
+  };
+
+  const restartWizard = () => {
+    setWizardAnswers({});
+    setWizardKey((k) => k + 1);
+    setScreen("wizard");
+  };
 
   // Kill switch — асинхронно, не блокирует UI. Если ответ пришёл с
   // active:false, поверх обычного UI накрывает оверлей. До ответа
@@ -85,12 +116,39 @@ function App() {
     getMode().then((m) => {
       if (m) {
         setMode(m);
-        setScreen("list");
+        setScreen(m === "pretenzii" ? "wizard" : "list");
         setModeFromArgv(true);
       }
       setReady(true);
     });
   }, []);
+
+  // Загрузка анкеты + шаблонов претензий и строгая валидация (этап 8.2.3).
+  // Перечитывается после фонового обновления шаблонов (templatesNonce).
+  useEffect(() => {
+    if (mode !== "pretenzii") return;
+    let cancelled = false;
+    listTemplates("pretenzii")
+      .then((r) => {
+        if (cancelled) return;
+        setPretenziiTemplates(r.templates);
+        setWizard(r.wizard);
+        if (!r.wizard) {
+          setWizardConfigError([
+            "Не найден файл анкеты templates/pretenzii/_wizard.yaml.",
+          ]);
+          return;
+        }
+        const errors = validateWizard(r.wizard, r.templates);
+        setWizardConfigError(errors.length > 0 ? errors : null);
+      })
+      .catch((e) => {
+        if (!cancelled) setWizardConfigError([String(e)]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, templatesNonce]);
 
   useEffect(() => {
     const title = mode ? titles[mode] : titles.none;
@@ -128,6 +186,14 @@ function App() {
 
   if (!ready) return null;
 
+  // Возврат к началу выбора шаблона из формы: претензии → анкета (с экрана
+  // успеха черновик уже удалён), документация → список.
+  const backToStart = () => {
+    setSelected(null);
+    if (mode === "pretenzii") restartWizard();
+    else setScreen("list");
+  };
+
   let content;
   if (screen === "form" && selected && mode) {
     content = (
@@ -136,7 +202,46 @@ function App() {
         template={selected}
         onBack={() => {
           setSelected(null);
-          setScreen("list");
+          setScreen(mode === "pretenzii" ? "wizard" : "list");
+        }}
+        onNewTemplate={backToStart}
+      />
+    );
+  } else if (screen === "wizard" && mode === "pretenzii" && wizard) {
+    content = (
+      <WizardPage
+        key={wizardKey}
+        wizard={wizard}
+        templates={pretenziiTemplates}
+        onComplete={({ template, answers }) => {
+          setWizardAnswers(answers);
+          if (template) {
+            setSelected(template);
+            setScreen("form");
+          } else {
+            setScreen("indev");
+          }
+        }}
+        onExit={() => {
+          if (modeFromArgv) return; // режим зашит в ярлык — выходить некуда
+          setMode(null);
+          setScreen("mode");
+        }}
+      />
+    );
+  } else if (screen === "indev" && mode === "pretenzii" && wizard) {
+    content = (
+      <InDevelopmentPage
+        wizard={wizard}
+        answers={wizardAnswers}
+        onRestart={restartWizard}
+        onHome={() => {
+          if (modeFromArgv) {
+            restartWizard();
+            return;
+          }
+          setMode(null);
+          setScreen("mode");
         }}
       />
     );
@@ -159,12 +264,15 @@ function App() {
         }
       />
     );
+  } else if ((screen === "wizard" || screen === "indev") && mode === "pretenzii") {
+    // Анкета ещё грузится с диска — не мигаем экраном выбора режима.
+    content = null;
   } else {
     content = (
       <ModeSelect
         onSelect={(m) => {
           setMode(m);
-          setScreen("list");
+          goToModeStart(m);
         }}
       />
     );
@@ -176,8 +284,31 @@ function App() {
       {appUpdate && !blocked && (
         <UpdaterPrompt update={appUpdate} onDismiss={() => setAppUpdate(null)} />
       )}
+      {mode === "pretenzii" && wizardConfigError && (
+        <WizardConfigErrorOverlay errors={wizardConfigError} />
+      )}
       {blocked && <BlockedOverlay message={blocked.message} />}
     </>
+  );
+}
+
+/// Блокирующий оверлей при провале валидации анкеты (этап 8.2.3): кривая
+/// конфигурация не должна выпускать юриста в незаконсистентную форму.
+function WizardConfigErrorOverlay({ errors }: { errors: string[] }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+      <div className="max-w-lg space-y-4 rounded-lg border bg-background p-6">
+        <h2 className="text-lg font-semibold">Анкета настроена некорректно</h2>
+        <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+          {errors.map((e, i) => (
+            <li key={i}>{e}</li>
+          ))}
+        </ul>
+        <Button className="w-full" onClick={() => getCurrentWindow().close()}>
+          Закрыть
+        </Button>
+      </div>
+    </div>
   );
 }
 

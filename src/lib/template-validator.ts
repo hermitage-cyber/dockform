@@ -27,12 +27,39 @@ export function validateTemplate(template: TemplateConfig): string[] {
     if (field.type === "calculator") {
       validateCalculatorField(field, prefix, producedVars, errors);
     }
-    if (field.text_output !== undefined) {
+    // != null покрывает и undefined, и null: Rust сериализует пустой
+    // Option<String> как text_output: null, а не как отсутствие ключа.
+    if (field.text_output != null) {
       validateTextOutput(field, prefix, fieldNames, producedVars, errors);
     }
   }
 
+  validateExtraTemplates(template, prefix, errors);
+
   return errors;
+}
+
+/// Этап 8.8: расширение .docx и отсутствие дублей имён среди доп. документов
+/// (включая совпадение с основным). Существование файлов проверяет Rust.
+function validateExtraTemplates(
+  template: TemplateConfig,
+  prefix: string,
+  errors: string[],
+): void {
+  const extras = template.extra_templates;
+  if (!extras || extras.length === 0) return;
+
+  const seen = new Set<string>([template.template]);
+  for (const extra of extras) {
+    if (!extra.template.toLowerCase().endsWith(".docx")) {
+      errors.push(`${prefix}: доп. документ «${extra.template}» должен иметь расширение .docx.`);
+    }
+    if (seen.has(extra.template)) {
+      errors.push(`${prefix}: доп. документ «${extra.template}» указан дважды (или совпадает с основным).`);
+    } else {
+      seen.add(extra.template);
+    }
+  }
 }
 
 function validateCalculatorField(
