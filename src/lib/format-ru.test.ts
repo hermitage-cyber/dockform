@@ -33,6 +33,7 @@ describe("formatValuesForDocx", () => {
       { name: "дата_договора", label: "дата", type: "date" },
       { name: "номер_договора", label: "номер", type: "text" },
       { name: "сумма", label: "сумма", type: "number" },
+      { name: "флаг", label: "флаг", type: "radio", options: ["Да", "Нет"] },
     ],
   };
 
@@ -54,6 +55,19 @@ describe("formatValuesForDocx", () => {
       "дата_договора": "",
     });
     expect(result["дата_договора"]).toBe("");
+  });
+
+  it("radio «Нет» → пустая строка (falsy для условного блока)", () => {
+    const result = formatValuesForDocx(template, { "флаг": "Нет" });
+    expect(result["флаг"]).toBe("");
+  });
+
+  it("radio «Да» и другие значения остаются как есть", () => {
+    expect(formatValuesForDocx(template, { "флаг": "Да" })["флаг"]).toBe("Да");
+    // текстовое поле со значением «Нет» не трогаем — нормализуем только radio
+    expect(
+      formatValuesForDocx(template, { "номер_договора": "Нет" })["номер_договора"],
+    ).toBe("Нет");
   });
 
   it("не мутирует исходный объект", () => {

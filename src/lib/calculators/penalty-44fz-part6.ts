@@ -1,4 +1,5 @@
 import { formatRubAmount } from "@/lib/format-ru";
+import { describeInteger } from "@/lib/russian-numerals";
 import type { CalculatorDef } from "./types";
 
 /**
@@ -8,12 +9,24 @@ import type { CalculatorDef } from "./types";
  *   пеня = (ставка_цб % / 300) × сумма × дней
  *
  * Ставку передаём в процентах (например, 21 — это 21 %).
- * Возвращаем сумму и человекочитаемую формулу для подстановки в .docx.
+ * Возвращаем сумму целиком, формулу и разбивку «рубли / копейки / прописью»
+ * — последняя нужна шаблонам, где сумма пишется как «32 009 руб. 75 коп.
+ * (Тридцать две тысячи девять рублей 75 копеек)». Плюс форматированные база и
+ * ставка: сырой type:number подставился бы в .docx с точкой, а конвенция —
+ * запятая (см. CLAUDE.md).
  */
 export const penalty44FzPart6: CalculatorDef = {
   id: "penalty_44fz_part6",
   inputs: ["сумма_контракта", "дней_просрочки", "ставка_цб"],
-  outputs: ["сумма_неустойки", "расчёт_подробно"],
+  outputs: [
+    "сумма_неустойки",
+    "расчёт_подробно",
+    "сумма_неустойки_руб",
+    "сумма_неустойки_коп",
+    "сумма_неустойки_прописью",
+    "сумма_базы_формат",
+    "ставка_формат",
+  ],
   run: (raw) => {
     const sum = Number(raw["сумма_контракта"]);
     const days = Number(raw["дней_просрочки"]);
@@ -27,20 +40,36 @@ export const penalty44FzPart6: CalculatorDef = {
     }
 
     const penalty = (rate / 100 / 300) * sum * days;
-    const rounded = Math.round(penalty * 100) / 100;
+    const cents = Math.round(penalty * 100);
+    const rounded = cents / 100;
+    const rub = Math.floor(cents / 100);
+    const kop = cents % 100;
 
     const formula =
       `${formatRubAmount(sum)} ₽ × ${days} дн. × ${formatRate(rate)} % ÷ 300 = ` +
       `${formatRubAmount(rounded)} ₽`;
 
+    // Целое прописью без послелога «рубль»: в .docx слово «рублей» уже стоит
+    // рядом ({...прописью} рублей {...коп} копеек). С заглавной буквы.
+    const rubWords = capitalize(describeInteger(rub, { unit: null }));
+
     return {
-      // Денежный выход — строка в русской локали (см. CLAUDE.md).
+      // Денежные выходы — строки в русской локали (см. CLAUDE.md).
       "сумма_неустойки": formatRubAmount(rounded),
       "расчёт_подробно": formula,
+      "сумма_неустойки_руб": rub.toLocaleString("ru-RU"),
+      "сумма_неустойки_коп": String(kop).padStart(2, "0"),
+      "сумма_неустойки_прописью": rubWords,
+      "сумма_базы_формат": formatRubAmount(sum),
+      "ставка_формат": formatRate(rate),
     };
   },
 };
 
 function formatRate(n: number): string {
   return n.toLocaleString("ru-RU", { maximumFractionDigits: 4 });
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }

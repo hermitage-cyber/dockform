@@ -36,6 +36,12 @@ export function isoDateToRu(iso: string): string {
 /// Калькуляторы свои выходы форматируют сами (см. format-ru), здесь
 /// они не трогаются.
 ///
+/// Условные блоки в .docx: docxtemplater по умолчанию считает истинной любую
+/// непустую строку, в том числе «Нет». Конвенция проекта (CLAUDE.md) — «Нет»
+/// должно скрывать блок {#поле}. Поэтому ответ «Нет» у radio-поля приводим к
+/// пустой строке (falsy), а «Да» и описательные варианты оставляем как есть.
+/// Это включает блоки {#поле}…{/поле} / {^поле}…{/поле} для radio Да/Нет.
+///
 /// Возвращает новый объект, исходный не мутирует.
 export function formatValuesForDocx(
   template: TemplateConfig,
@@ -48,6 +54,8 @@ export function formatValuesForDocx(
       if (typeof v === "string" && v !== "") {
         out[field.name] = isoDateToRu(v);
       }
+    } else if (field.type === "radio" && out[field.name] === "Нет") {
+      out[field.name] = "";
     }
   }
   return out;

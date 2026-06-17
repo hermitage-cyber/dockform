@@ -13,7 +13,9 @@ function makeTemplate(fields: FieldConfig[]): TemplateConfig {
 }
 
 // penalty_44fz_part6: inputs [сумма_контракта, дней_просрочки, ставка_цб],
-// outputs [сумма_неустойки, расчёт_подробно] — зарегистрирован в реестре.
+// outputs [сумма_неустойки, расчёт_подробно, сумма_неустойки_руб,
+// сумма_неустойки_коп, сумма_неустойки_прописью, сумма_базы_формат,
+// ставка_формат] — зарегистрирован в реестре. YAML обязан маппить все выходы.
 const validCalc: FieldConfig = {
   name: "неустойка_блок",
   label: "Неустойка",
@@ -27,6 +29,11 @@ const validCalc: FieldConfig = {
   outputs: {
     сумма_неустойки: "итог",
     расчёт_подробно: "расчёт_текст",
+    сумма_неустойки_руб: "итог_руб",
+    сумма_неустойки_коп: "итог_коп",
+    сумма_неустойки_прописью: "итог_прописью",
+    сумма_базы_формат: "база_формат",
+    ставка_формат: "ставка_текст",
   },
 };
 
@@ -71,6 +78,59 @@ describe("validateTemplate — калькуляторы", () => {
       outputs: { сумма_неустойки: "итог", расчёт_подробно: "другой_текст" },
     };
     const errors = validateTemplate(makeTemplate([validCalc, second]));
+    expect(errors.some((e) => /итог.*уже заполняется/.test(e))).toBe(true);
+  });
+
+  it("одинаковый variant_group разрешает делить выходные переменные", () => {
+    const byDays: FieldConfig = {
+      name: "срок_дни",
+      label: "Срок днями",
+      type: "calculator",
+      calculator: "delivery_overdue",
+      variant_group: "срок",
+      inputs: {
+        дата_договора: "дата_дог",
+        срок_исполнения_дней: "дней",
+        дата_фактического_исполнения: "дата_факт",
+      },
+      outputs: {
+        дата_дедлайна: "дедлайн",
+        дней_просрочки: "просрочка",
+        срок_исполнения_прописью: "срок_текст",
+      },
+    };
+    const byDate: FieldConfig = {
+      name: "срок_дата",
+      label: "Срок датой",
+      type: "calculator",
+      calculator: "overdue_from_deadline",
+      variant_group: "срок",
+      inputs: {
+        дата_дедлайна: "дедлайн_вручную",
+        дата_фактического_исполнения: "дата_факт",
+      },
+      // обе переменные совпадают с byDays — но это разрешено одной группой
+      outputs: {
+        дата_дедлайна_формат: "дедлайн",
+        дней_просрочки: "просрочка",
+      },
+    };
+    expect(validateTemplate(makeTemplate([byDays, byDate]))).toEqual([]);
+  });
+
+  it("без variant_group та же коллизия снова ошибка", () => {
+    const byDate: FieldConfig = {
+      name: "срок_дата",
+      label: "Срок датой",
+      type: "calculator",
+      calculator: "overdue_from_deadline",
+      inputs: {
+        дата_дедлайна: "дедлайн_вручную",
+        дата_фактического_исполнения: "дата_факт",
+      },
+      outputs: { дата_дедлайна_формат: "итог", дней_просрочки: "просрочка" },
+    };
+    const errors = validateTemplate(makeTemplate([validCalc, byDate]));
     expect(errors.some((e) => /итог.*уже заполняется/.test(e))).toBe(true);
   });
 });

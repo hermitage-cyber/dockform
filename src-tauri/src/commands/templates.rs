@@ -15,6 +15,16 @@ pub enum FieldType {
     Calculator,
 }
 
+// Вариант radio/dropdown. Короткая форма — строка (value == подпись), объектная
+// разделяет хранимое значение и подпись (например, value: "Да" / label: "НГ").
+// untagged: serde сам выбирает форму по виду YAML-узла.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum FieldOption {
+    Simple(String),
+    Labeled { value: String, label: String },
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FieldConfig {
     pub name: String,
@@ -24,7 +34,7 @@ pub struct FieldConfig {
     #[serde(default)]
     pub required: Option<bool>,
     #[serde(default)]
-    pub options: Option<Vec<String>>,
+    pub options: Option<Vec<FieldOption>>,
     #[serde(default)]
     pub visible_if: Option<String>,
     #[serde(default)]
@@ -45,6 +55,14 @@ pub struct FieldConfig {
     pub inputs: Option<BTreeMap<String, String>>,
     #[serde(default)]
     pub outputs: Option<BTreeMap<String, String>>,
+    // display_outputs — какие выходы калькулятора показывать оператору (и в каком
+    // порядке). На .docx не влияет. Если пусто — показываются все.
+    #[serde(default)]
+    pub display_outputs: Option<Vec<String>>,
+    // variant_group — взаимоисключающая развилка калькуляторов: блоки с одним
+    // значением делят выходные переменные (валидатор не считает это коллизией).
+    #[serde(default)]
+    pub variant_group: Option<String>,
     // text_output — этап 7.5: парная переменная-пропись для type:number.
     #[serde(default)]
     pub text_output: Option<String>,

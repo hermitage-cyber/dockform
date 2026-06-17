@@ -34,3 +34,6 @@ output/
 
 # Word lock-файлы (создаются, пока документ открыт в Word)
 ~$*
+
+# Python cache
+scripts/__pycache__/

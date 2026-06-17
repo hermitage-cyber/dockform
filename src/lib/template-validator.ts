@@ -21,7 +21,8 @@ export function validateTemplate(template: TemplateConfig): string[] {
   const fieldNames = new Set(template.fields.map((f) => f.name));
   // Имена переменных, уже занятых производными выходами (text_output + outputs
   // калькуляторов). Нужны, чтобы два поля не писали в одну и ту же переменную.
-  const producedVars = new Map<string, string>();
+  // Исключение — поля одной variant_group (взаимоисключающая развилка).
+  const producedVars = new Map<string, { owner: string; group?: string }>();
 
   for (const field of template.fields) {
     if (field.type === "calculator") {
@@ -65,7 +66,7 @@ function validateExtraTemplates(
 function validateCalculatorField(
   field: FieldConfig,
   prefix: string,
-  producedVars: Map<string, string>,
+  producedVars: Map<string, { owner: string; group?: string }>,
   errors: string[],
 ): void {
   const at = `${prefix}, поле «${field.name}»`;
@@ -103,7 +104,7 @@ function validateCalculatorField(
     );
     // Выходы калькулятора пишутся в переменные документа — следим за коллизиями.
     for (const varName of Object.values(field.outputs)) {
-      registerVar(varName, field.name, at, producedVars, errors);
+      registerVar(varName, field.name, at, producedVars, errors, field.variant_group);
     }
   }
 }
@@ -112,7 +113,7 @@ function validateTextOutput(
   field: FieldConfig,
   prefix: string,
   fieldNames: Set<string>,
-  producedVars: Map<string, string>,
+  producedVars: Map<string, { owner: string; group?: string }>,
   errors: string[],
 ): void {
   const at = `${prefix}, поле «${field.name}»`;
@@ -132,21 +133,27 @@ function validateTextOutput(
 }
 
 /// Регистрирует производную переменную и сообщает о коллизии двух источников.
+/// Коллизия допустима, если оба поля принадлежат одной непустой variant_group
+/// (взаимоисключающая развилка калькуляторов — в шаблоне активен один).
 function registerVar(
   varName: string,
   owner: string,
   at: string,
-  producedVars: Map<string, string>,
+  producedVars: Map<string, { owner: string; group?: string }>,
   errors: string[],
+  group?: string,
 ): void {
   const existing = producedVars.get(varName);
-  if (existing && existing !== owner) {
-    errors.push(
-      `${at}: переменная «${varName}» уже заполняется полем «${existing}».`,
-    );
+  if (existing && existing.owner !== owner) {
+    const sameGroup = group != null && group !== "" && existing.group === group;
+    if (!sameGroup) {
+      errors.push(
+        `${at}: переменная «${varName}» уже заполняется полем «${existing.owner}».`,
+      );
+    }
     return;
   }
-  producedVars.set(varName, owner);
+  producedVars.set(varName, { owner, group });
 }
 
 /// Сравнивает объявленный в YAML набор ключей с метаданными калькулятора.

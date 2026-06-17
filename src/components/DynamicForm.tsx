@@ -25,7 +25,7 @@ import {
   saveDraft,
   type DraftPayload,
 } from "@/lib/tauri";
-import type { Dictionaries, FieldConfig, TemplateConfig } from "@/types";
+import type { Dictionaries, FieldConfig, FieldOption, TemplateConfig } from "@/types";
 
 type Props = {
   config: TemplateConfig;
@@ -221,6 +221,13 @@ export function DynamicForm({ config, onSubmit, disabled, draftKey, submitLabel 
   );
 }
 
+// Приводит options к единой форме {value, label}. Строка → value == label.
+function normalizeOptions(options: FieldConfig["options"]): FieldOption[] {
+  return (options ?? []).map((opt) =>
+    typeof opt === "string" ? { value: opt, label: opt } : opt,
+  );
+}
+
 function hasAnyValue(values: FormValues): boolean {
   for (const v of Object.values(values)) {
     if (v === undefined || v === null || v === "") continue;
@@ -273,11 +280,11 @@ function renderField(
           rules={rules}
           render={({ field: { value, onChange } }) => (
             <RadioGroup value={(value as string) ?? ""} onValueChange={onChange}>
-              {(f.options ?? []).map((opt) => (
-                <div key={opt} className="flex items-center space-x-2">
-                  <RadioGroupItem value={opt} id={`${f.name}-${opt}`} />
-                  <Label htmlFor={`${f.name}-${opt}`} className="font-normal">
-                    {opt}
+              {normalizeOptions(f.options).map((opt) => (
+                <div key={opt.value} className="flex items-center space-x-2">
+                  <RadioGroupItem value={opt.value} id={`${f.name}-${opt.value}`} />
+                  <Label htmlFor={`${f.name}-${opt.value}`} className="font-normal">
+                    {opt.label}
                   </Label>
                 </div>
               ))}
@@ -298,9 +305,9 @@ function renderField(
                 <SelectValue placeholder="Выберите…" />
               </SelectTrigger>
               <SelectContent>
-                {(f.options ?? []).map((opt) => (
-                  <SelectItem key={opt} value={opt}>
-                    {opt}
+                {normalizeOptions(f.options).map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
                   </SelectItem>
                 ))}
               </SelectContent>

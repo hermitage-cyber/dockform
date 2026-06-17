@@ -98,7 +98,7 @@ export function CalculatorField({ field, control, setValue }: Props) {
         )}
         {state.phase === "ok" && field.outputs && (
           <dl className="space-y-1 text-sm">
-            {Object.keys(field.outputs).map((calcKey) => (
+            {(field.display_outputs ?? Object.keys(field.outputs)).map((calcKey) => (
               <div key={calcKey} className="flex flex-wrap gap-x-2">
                 <dt className="text-muted-foreground">{humanize(calcKey)}:</dt>
                 <dd className="font-medium">{formatValue(state.result[calcKey])}</dd>
@@ -112,7 +112,8 @@ export function CalculatorField({ field, control, setValue }: Props) {
 }
 
 function humanize(key: string): string {
-  return key.replace(/_/g, " ");
+  const s = key.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function formatValue(v: unknown): string {
