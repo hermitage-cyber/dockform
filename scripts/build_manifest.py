@@ -32,7 +32,11 @@ def collect(base: Path) -> dict[str, str]:
     Пропускает:
       - скрытые файлы (.gitkeep, .DS_Store, …) — мусор с точки зрения артефактов;
       - временные блокировки Word `~$*.docx`/`~$*.doc` — они существуют, пока
-        у юриста открыт документ, и их хеши не должны уезжать к пользователям.
+        у юриста открыт документ, и их хеши не должны уезжать к пользователям;
+      - папку `old/` на любом уровне — архив старых шаблонов, в репо нужен
+        для истории, на флешку пилоту — нет;
+      - `.md` файлы — служебные заметки разработчика (плейсхолдеры, разметка),
+        пользователю не нужны.
     """
     out: dict[str, str] = {}
     if not base.exists():
@@ -44,6 +48,10 @@ def collect(base: Path) -> dict[str, str]:
         if any(part.startswith(".") for part in rel_parts):
             continue
         if any(part.startswith("~$") for part in rel_parts):
+            continue
+        if "old" in rel_parts:
+            continue
+        if p.suffix.lower() == ".md":
             continue
         out[p.relative_to(base).as_posix()] = sha256(p)
     return out

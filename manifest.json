@@ -7,7 +7,20 @@
     "documentation/44_tovar_smp_ktru.yaml": "03fd9620354122e3945b4ed92ebf077151aec4b1180f811127daf367cfd9dc68",
     "documentation/test.docx": "6e81c952417132e43570577f50b4a6a2ed083dd003c4ee7b03be8cd286533478",
     "documentation/test.yaml": "d59600755f8770cb6e38a340c4e565e8f1188c0233b228795133ceaa412ec6e9",
-    "pretenzii/Претензия_шаблон.docx": "a44421647ef2b9a2865f7f2a587d309fe0f1da26ff851161864a3a7891c65ca4",
-    "pretenzii/Претензия_шаблон.yaml": "80b9a6ee8b073146437cdc8060ba53bee5f6a8941312c2ba1fd4dfd0f69f9d00"
+    "pretenzii/44_аук_1част_пост_претензия.docx": "a8e912800a71b2616966d5668ff6d7bfc09c0503e25e74c2ba7f67131951cf72",
+    "pretenzii/44_аук_1част_пост_претензия.yaml": "50c6f526d0c40c8e984ceb426f66fb270e5dddb9afb09546d7ba1132c6312a2c",
+    "pretenzii/44_аук_2част_пост_претензия.docx": "05f0ddf7a3c4b55beb6541f15a2b8b7e953168c06b2e9c7ae4b0892c9c812ba4",
+    "pretenzii/44_аук_2част_пост_претензия.yaml": "959f6926a459873e5ff08c52667d44a6395ea67a07d64e87027dbeb454a44c34",
+    "pretenzii/44_аук_3част_пост_претензия.docx": "19fb763404d83b8abc70a9abd3b4022cc56f2a816a21c4076b33c4224621eb36",
+    "pretenzii/44_аук_3част_пост_претензия.yaml": "551b8b42ee45b4f76b92839ed93acc6903ece4528c21c4a280a3fdc1ddbde228",
+    "pretenzii/44_аук_4част_пост_претензия.docx": "c41cad77ea53dd184709366b60a58a8f51078cbc154a8c9761a376937a85516d",
+    "pretenzii/44_аук_4част_пост_претензия.yaml": "64a1dde40a50d726eb87d5492acb66d66b61ec13c40289bcb9c5d098eac65a16",
+    "pretenzii/44_аук_единовр_пост_претензия.docx": "6d354293eb79a73043fc30ffcfd21f47349a52d3a75cc23adad756062b2c863a",
+    "pretenzii/44_аук_единовр_пост_претензия.yaml": "ee6e0a6c847f4bb93442d72e05fe7003a081efae7a24a772e6ac77e6ccd82c63",
+    "pretenzii/44_аук_единовр_пост_решение.docx": "f050cffa0280a7ca947e6130ae39bdb2e8e1bf016010cc2e344a07d35d74c5c7",
+    "pretenzii/44_аук_единовр_пост_сз_счет.docx": "ac68ee3378b21361de32156105f21ae409f361ffe7858f44629b9cf1e902dfb5",
+    "pretenzii/44_аук_част_пост_решение.docx": "a93248a819ef0219daab3f21de10131a55a5266ea0cb3582bbdf1c03aaa2bf7c",
+    "pretenzii/44_аук_част_пост_сз_счет.docx": "2c97f98bb82331b1ddf790caadeaa9610d3e2ffa6b45304f1975c3723c49c45c",
+    "pretenzii/_wizard.yaml": "ca26c16623ff09f97ebc3dd94f8d05ebfb91bc77f3bd2be9a03ac3ee2528c195"
   }
 }
