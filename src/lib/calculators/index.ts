@@ -2,6 +2,7 @@ import type { CalculatorDef, CalculatorInputs, CalculatorOutputs } from "./types
 import { deliveryOverdue } from "./delivery-overdue";
 import { overdueFromDeadline } from "./overdue-from-deadline";
 import { penalty44FzPart6 } from "./penalty-44fz-part6";
+import { penalty44FzPartial } from "./penalty-44fz-partial";
 import { penaltyContractDailyPercent } from "./penalty-contract-daily-percent";
 
 /**
@@ -15,6 +16,7 @@ export const CALCULATORS: Record<string, CalculatorDef> = {
   [deliveryOverdue.id]: deliveryOverdue,
   [overdueFromDeadline.id]: overdueFromDeadline,
   [penalty44FzPart6.id]: penalty44FzPart6,
+  [penalty44FzPartial.id]: penalty44FzPartial,
   [penaltyContractDailyPercent.id]: penaltyContractDailyPercent,
 };
 
@@ -34,7 +36,9 @@ export function runCalculator(
   if (!def) {
     throw new Error(`Калькулятор «${id}» не найден в реестре.`);
   }
+  const optional = new Set(def.optionalInputs ?? []);
   for (const key of def.inputs) {
+    if (optional.has(key)) continue; // опциональный вход не обязателен
     const v = raw[key];
     if (v == null || v === "") return null;
   }

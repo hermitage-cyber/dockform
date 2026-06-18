@@ -87,6 +87,53 @@ def classify(xml: str):
     return values, conds
 
 
+def _apply_intervals(xml, nodes, ranges, repls):
+    """Применяет правки (start, end, repl) в координатах склейки к узлам w:t.
+
+    Плейсхолдер repl вставляется в узел, содержащий позицию start; символы
+    внутри [start, end) выкидываются; текст вне правок — как есть.
+    """
+    def starts_at(gp):
+        for a, b, r in repls:
+            if a == gp:
+                return r
+        return None
+
+    def inside(gp):
+        return any(a <= gp < b for a, b, _ in repls)
+
+    edits = []
+    for (xs, xe, text), (ns, ne) in zip(nodes, ranges):
+        out = []
+        for off in range(len(text)):
+            gp = ns + off
+            r = starts_at(gp)
+            if r is not None:
+                out.append(r)
+            if inside(gp):
+                continue
+            out.append(text[off])
+        new_inner = "".join(out)
+        if new_inner != text:
+            edits.append((xs, xe, f'<w:t xml:space="preserve">{html.escape(new_inner)}</w:t>'))
+
+    for xs, xe, repl in sorted(edits, key=lambda e: e[0], reverse=True):
+        xml = xml[:xs] + repl + xml[xe:]
+    return xml
+
+
+def replace_region(xml: str, pattern: str, replacement: str) -> str:
+    """Заменяет первый участок склеенного текста, совпавший с regex pattern, на
+    replacement. Для структурных мест (ОИК-концовка: две альтернативы + старые
+    комментарии «@…@» сворачиваем в один блок {^}/{#}). Якорь должен быть
+    уникален (например, начинаться с «<или удержать»)."""
+    nodes, full, ranges = _nodes(xml)
+    m = re.search(pattern, full, re.S)
+    if not m:
+        raise ValueError("регион по шаблону не найден")
+    return _apply_intervals(xml, nodes, ranges, [(m.start(), m.end(), replacement)])
+
+
 def transform(xml: str, value_targets) -> str:
     nodes, full, ranges = _nodes(xml)
 
@@ -107,37 +154,7 @@ def transform(xml: str, value_targets) -> str:
     if leftover:
         raise ValueError(f"targets не израсходованы ({len(leftover)} лишних)")
 
-    def starts_at(gp):
-        for a, b, r in repls:
-            if a == gp:
-                return r
-        return None
-
-    def inside(gp):
-        return any(a <= gp < b for a, b, _ in repls)
-
-    # Пересобираем текст каждого узла: вставляем плейсхолдер в позиции начала
-    # маркера, символы внутри <…> выкидываем. Текст вне маркеров — как есть.
-    edits = []
-    for (xs, xe, text), (ns, ne) in zip(nodes, ranges):
-        out = []
-        for off in range(len(text)):
-            gp = ns + off
-            r = starts_at(gp)
-            if r is not None:
-                out.append(r)
-            if inside(gp):
-                continue
-            out.append(text[off])
-        # маркер может начинаться ровно на стыке (в конце узла) — это начало
-        # следующего узла, не наше.
-        new_inner = "".join(out)
-        if new_inner != text:
-            edits.append((xs, xe, f'<w:t xml:space="preserve">{html.escape(new_inner)}</w:t>'))
-
-    for xs, xe, repl in sorted(edits, key=lambda e: e[0], reverse=True):
-        xml = xml[:xs] + repl + xml[xe:]
-    return xml
+    return _apply_intervals(xml, nodes, ranges, repls)
 
 
 def process(path: str, value_targets, out_path: str = None):

@@ -47,8 +47,21 @@ export type DraftPayload = {
   values: Record<string, unknown>;
 };
 
+/// Rust-сторона (validate_key в commands/drafts.rs) принимает только
+/// `[A-Za-z0-9_-]`. У претензий имена шаблонов на кириллице, поэтому
+/// неASCII-идентификатор кодируем в base64url без паддинга. Чисто-ASCII id
+/// пропускаются как есть — чтобы старые черновики documentation остались
+/// читаемыми.
+function encodeTemplateId(id: string): string {
+  if (/^[A-Za-z0-9_-]+$/.test(id)) return id;
+  const bytes = new TextEncoder().encode(id);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 export function draftKey(mode: Mode, templateId: string): string {
-  return `${mode}__${templateId}`;
+  return `${mode}__${encodeTemplateId(templateId)}`;
 }
 
 export async function saveDraft(key: string, payload: DraftPayload): Promise<void> {

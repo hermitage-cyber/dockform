@@ -90,6 +90,7 @@ function validateCalculatorField(
       Object.keys(field.inputs),
       def.inputs,
       errors,
+      def.optionalInputs,
     );
   }
 
@@ -101,6 +102,7 @@ function validateCalculatorField(
       Object.keys(field.outputs),
       def.outputs,
       errors,
+      def.optionalOutputs,
     );
     // Выходы калькулятора пишутся в переменные документа — следим за коллизиями.
     for (const varName of Object.values(field.outputs)) {
@@ -157,16 +159,21 @@ function registerVar(
 }
 
 /// Сравнивает объявленный в YAML набор ключей с метаданными калькулятора.
+/// optional — ключи, отсутствие которых в YAML не считается ошибкой.
 function reportSetMismatch(
   at: string,
   declared: string[],
   expected: readonly string[],
   errors: string[],
+  optional: readonly string[] = [],
 ): void {
   const expectedSet = new Set(expected);
   const declaredSet = new Set(declared);
+  const optionalSet = new Set(optional);
 
-  const missing = expected.filter((k) => !declaredSet.has(k));
+  const missing = expected.filter(
+    (k) => !declaredSet.has(k) && !optionalSet.has(k),
+  );
   const extra = declared.filter((k) => !expectedSet.has(k));
 
   if (missing.length > 0) {

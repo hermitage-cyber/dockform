@@ -76,6 +76,22 @@ export function DynamicForm({ config, onSubmit, disabled, draftKey, submitLabel 
     [config.fields],
   );
 
+  // Производные значения, которые пишутся в стейт формы калькуляторами и
+  // NumberAmountWords через setValue. В черновик их не сохраняем (пересчитаются
+  // из исходных полей) и при восстановлении не считаем «потерянными».
+  const derivedNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const f of config.fields) {
+      if (f.type === "calculator" && f.outputs) {
+        for (const varName of Object.values(f.outputs)) names.add(varName);
+      }
+      if (f.type === "number" && f.text_output) {
+        names.add(f.text_output);
+      }
+    }
+    return names;
+  }, [config.fields]);
+
   // Загружаем черновик при первом маунте/смене ключа.
   useEffect(() => {
     if (!draftKey) return;
@@ -107,12 +123,18 @@ export function DynamicForm({ config, onSubmit, disabled, draftKey, submitLabel 
     if (!draftKey) return;
     const sub = watch((data) => {
       if (!decisionMadeRef.current) return;
-      if (!hasAnyValue(data as FormValues)) return;
+      // Сохраняем только поля, объявленные в YAML. Выходы калькуляторов и
+      // суммы прописью пересчитаются при восстановлении.
+      const filtered: FormValues = {};
+      for (const [k, v] of Object.entries(data as FormValues)) {
+        if (knownFieldNames.has(k)) filtered[k] = v;
+      }
+      if (!hasAnyValue(filtered)) return;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
         saveDraft(draftKey, {
           saved_at: new Date().toISOString(),
-          values: data as FormValues,
+          values: filtered,
         }).catch((e) => {
           // Не блокируем работу формы из-за фоновой записи.
           console.error("[draft] save failed:", e);
@@ -123,13 +145,17 @@ export function DynamicForm({ config, onSubmit, disabled, draftKey, submitLabel 
       sub.unsubscribe();
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [draftKey, watch]);
+  }, [draftKey, watch, knownFieldNames]);
 
   const handleRestore = () => {
     if (!draftFound) return;
     const incoming = draftFound.values;
-    const stale = Object.keys(incoming).filter((k) => !knownFieldNames.has(k));
-    // Заливаем только поля, которые есть в текущем шаблоне.
+    // «Потеряно» — только реальное поле формы, которое исчезло из YAML.
+    // Производные имена (наследие старых черновиков) игнорируем — они и так
+    // не нужны, потому что пересчитываются.
+    const stale = Object.keys(incoming).filter(
+      (k) => !knownFieldNames.has(k) && !derivedNames.has(k),
+    );
     const filtered: FormValues = {};
     for (const [k, v] of Object.entries(incoming)) {
       if (knownFieldNames.has(k)) filtered[k] = v;
