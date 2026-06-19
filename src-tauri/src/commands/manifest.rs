@@ -120,9 +120,19 @@ async fn download_file(
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("mkdir: {e}"))?;
     }
-    // Атомарно: .download.tmp + rename, чтобы при крэше посередине не остался
-    // полу-скачанный файл, на который потом наткнётся docxtemplater.
-    let tmp = dest.with_extension("download.tmp");
+    // Атомарно: <dest>.download.tmp + rename, чтобы при крэше посередине не
+    // остался полу-скачанный файл, на который потом наткнётся docxtemplater.
+    // ВАЖНО: добавляем суффикс к ПОЛНОМУ имени файла. `with_extension` заменяет
+    // расширение целиком — file.docx и file.yaml оба превратятся в один и тот
+    // же file.download.tmp и затрут друг друга при параллельной синхронизации.
+    let tmp = {
+        let mut name = dest
+            .file_name()
+            .ok_or_else(|| "no file name".to_string())?
+            .to_owned();
+        name.push(".download.tmp");
+        dest.with_file_name(name)
+    };
     {
         let mut f = std::fs::File::create(&tmp).map_err(|e| format!("create tmp: {e}"))?;
         f.write_all(&bytes).map_err(|e| format!("write: {e}"))?;
