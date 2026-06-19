@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatRubAmount, formatValuesForDocx, isoDateToRu } from "./format-ru";
+import {
+  formatRubAmount,
+  formatValuesForDocx,
+  isoDateToRu,
+  normalizeQuotes,
+} from "./format-ru";
 import type { TemplateConfig } from "@/types";
 
 describe("isoDateToRu", () => {
@@ -74,5 +79,33 @@ describe("formatValuesForDocx", () => {
     const input = { "дата_договора": "2026-02-15" };
     formatValuesForDocx(template, input);
     expect(input["дата_договора"]).toBe("2026-02-15");
+  });
+
+  it("прямые кавычки в текстовых полях → ёлочки", () => {
+    const result = formatValuesForDocx(template, {
+      "номер_договора": 'ООО "Альфа" и ООО "Бета"',
+    });
+    expect(result["номер_договора"]).toBe("ООО «Альфа» и ООО «Бета»");
+  });
+});
+
+describe("normalizeQuotes", () => {
+  it("парные прямые кавычки → ёлочки", () => {
+    expect(normalizeQuotes('ООО "Альфа"')).toBe("ООО «Альфа»");
+    expect(normalizeQuotes('"Альфа" и "Бета"')).toBe("«Альфа» и «Бета»");
+  });
+
+  it("уже стоящие ёлочки не трогаются", () => {
+    expect(normalizeQuotes("ООО «Альфа»")).toBe("ООО «Альфа»");
+  });
+
+  it("непарные кавычки: нечётная → «, дальше чередуем", () => {
+    expect(normalizeQuotes('"непарная')).toBe("«непарная");
+    expect(normalizeQuotes('"a" "b" "c')).toBe("«a» «b» «c");
+  });
+
+  it("пустая строка и строка без кавычек", () => {
+    expect(normalizeQuotes("")).toBe("");
+    expect(normalizeQuotes("без кавычек")).toBe("без кавычек");
   });
 });

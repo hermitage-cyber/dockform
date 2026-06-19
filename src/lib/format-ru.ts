@@ -29,6 +29,15 @@ export function isoDateToRu(iso: string): string {
   return `${m[3]}.${m[2]}.${m[1]}`;
 }
 
+/// Заменяет прямые кавычки `"` на русские ёлочки: нечётное вхождение → `«`,
+/// чётное → `»`. Уже стоящие `«`/`»` не трогаются. Юристы пишут `ООО "Альфа"`,
+/// а в документе должны быть `ООО «Альфа»` — иначе и типографика страдает,
+/// и Windows не сохранит файл с `"` в имени.
+export function normalizeQuotes(s: string): string {
+  let n = 0;
+  return s.replace(/"/g, () => (n++ % 2 === 0 ? "«" : "»"));
+}
+
 /// Преобразует значения формы перед подстановкой в .docx согласно
 /// конвенции локали:
 ///   - поля type:date     →  дд.мм.гггг
@@ -56,6 +65,11 @@ export function formatValuesForDocx(
       }
     } else if (field.type === "radio" && out[field.name] === "Нет") {
       out[field.name] = "";
+    } else {
+      const v = out[field.name];
+      if (typeof v === "string") {
+        out[field.name] = normalizeQuotes(v);
+      }
     }
   }
   return out;

@@ -2,6 +2,8 @@
 // Подставляет {field} → values[field] и {date} → текущая дата (ГГГГ-ММ-ДД).
 // Если какое-то поле из requiredFields пусто — возвращает список пустых полей.
 
+import { normalizeQuotes } from "./format-ru";
+
 export type FilenameResult =
   | { ok: true; filename: string }
   | { ok: false; missing: string[] };
@@ -15,6 +17,16 @@ function formatDate(d: Date): string {
 
 function isEmpty(v: unknown): boolean {
   return v === undefined || v === null || v === "";
+}
+
+/// Запрещённые в именах файлов Windows: < > : " / \ | ? * и control chars.
+/// Прямые `"` обычно прилетают из ООО "Альфа" — сначала нормализуем их в
+/// ёлочки (Windows их разрешает), потом срезаем то, что не выжило.
+// eslint-disable-next-line no-control-regex
+const WIN_FORBIDDEN = /[<>:"/\\|?*\x00-\x1F]/g;
+
+export function sanitizeFilename(name: string): string {
+  return normalizeQuotes(name).replace(WIN_FORBIDDEN, "");
 }
 
 export function buildFilename(
@@ -32,5 +44,5 @@ export function buildFilename(
     return isEmpty(v) ? "" : String(v);
   });
 
-  return { ok: true, filename };
+  return { ok: true, filename: sanitizeFilename(filename) };
 }
