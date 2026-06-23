@@ -2,7 +2,7 @@ template: test.docx
 title: "Тестовый шаблон"
 description: "Для проверки этапов 2–5: рендер формы, генерация .docx, dictionary."
 output_filename:
-  pattern: "test_{date}.docx"
+  pattern: "test_{date}_{time}.docx"
   fields: []
 fields:
   - name: имя

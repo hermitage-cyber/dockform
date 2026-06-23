@@ -1,5 +1,5 @@
 import { formatRubAmount } from "@/lib/format-ru";
-import { describeInteger } from "@/lib/russian-numerals";
+import { describeInteger, KOP, plural, RUB } from "@/lib/russian-numerals";
 import type { CalculatorDef } from "./types";
 
 /**
@@ -35,6 +35,7 @@ export const penalty44FzPartial: CalculatorDef = {
     "сумма_неустойки_руб",
     "сумма_неустойки_коп",
     "сумма_неустойки_прописью",
+    "сумма_неустойки_коп_прописью",
     "цена_формат",
     "поставка1_формат",
     "поставка2_формат",
@@ -43,7 +44,14 @@ export const penalty44FzPartial: CalculatorDef = {
     "база_формат",
     "ставка_формат",
   ],
-  optionalOutputs: ["поставка2_формат", "поставка3_формат", "поставка4_формат"],
+  optionalOutputs: [
+    "поставка2_формат",
+    "поставка3_формат",
+    "поставка4_формат",
+    // Парный вывод для парентезы «(… рублей NN копеек)». Старые шаблоны без
+    // явного маппинга остаются валидными.
+    "сумма_неустойки_коп_прописью",
+  ],
   run: (raw) => {
     const price = num(raw["цена_контракта"], "Цена контракта");
     const days = num(raw["дней_просрочки"], "Дни просрочки");
@@ -80,7 +88,9 @@ export const penalty44FzPartial: CalculatorDef = {
       "расчёт_подробно": formula,
       "сумма_неустойки_руб": rub.toLocaleString("ru-RU"),
       "сумма_неустойки_коп": String(kop).padStart(2, "0"),
-      "сумма_неустойки_прописью": capitalize(describeInteger(rub, { unit: null })),
+      // «Четыреста семь рублей» — с правильным склонением «рубль/рубля/рублей».
+      "сумма_неустойки_прописью": capitalize(describeInteger(rub, { unit: RUB })),
+      "сумма_неустойки_коп_прописью": `${String(kop).padStart(2, "0")} ${plural(kop, KOP)}`,
       "цена_формат": formatRubAmount(price),
       "поставка1_формат": formatRubAmount(p[0]),
       "поставка2_формат": formatRubAmount(p[1]),

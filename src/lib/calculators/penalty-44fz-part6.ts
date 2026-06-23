@@ -1,5 +1,5 @@
 import { formatRubAmount } from "@/lib/format-ru";
-import { describeInteger } from "@/lib/russian-numerals";
+import { describeInteger, KOP, plural, RUB } from "@/lib/russian-numerals";
 import type { CalculatorDef } from "./types";
 
 /**
@@ -24,9 +24,13 @@ export const penalty44FzPart6: CalculatorDef = {
     "сумма_неустойки_руб",
     "сумма_неустойки_коп",
     "сумма_неустойки_прописью",
+    "сумма_неустойки_коп_прописью",
     "сумма_базы_формат",
     "ставка_формат",
   ],
+  // Парный вывод для парентезы «(… рублей NN копеек)». Старые шаблоны без
+  // явного маппинга остаются валидными.
+  optionalOutputs: ["сумма_неустойки_коп_прописью"],
   run: (raw) => {
     const sum = Number(raw["сумма_контракта"]);
     const days = Number(raw["дней_просрочки"]);
@@ -49,9 +53,12 @@ export const penalty44FzPart6: CalculatorDef = {
       `${formatRubAmount(sum)} ₽ × ${days} дн. × ${formatRate(rate)} % ÷ 300 = ` +
       `${formatRubAmount(rounded)} ₽`;
 
-    // Целое прописью без послелога «рубль»: в .docx слово «рублей» уже стоит
-    // рядом ({...прописью} рублей {...коп} копеек). С заглавной буквы.
-    const rubWords = capitalize(describeInteger(rub, { unit: null }));
+    // «Четыреста семь рублей» — целое прописью с правильным склонением «рубль/
+    // рубля/рублей». С заглавной буквы, потому что подставляется в начало
+    // парентезы (… (Четыреста семь рублей 26 копеек)).
+    const rubWords = capitalize(describeInteger(rub, { unit: RUB }));
+    // «26 копеек» — цифра + склонение «копейка/копейки/копеек».
+    const kopWords = `${String(kop).padStart(2, "0")} ${plural(kop, KOP)}`;
 
     return {
       // Денежные выходы — строки в русской локали (см. CLAUDE.md).
@@ -60,6 +67,7 @@ export const penalty44FzPart6: CalculatorDef = {
       "сумма_неустойки_руб": rub.toLocaleString("ru-RU"),
       "сумма_неустойки_коп": String(kop).padStart(2, "0"),
       "сумма_неустойки_прописью": rubWords,
+      "сумма_неустойки_коп_прописью": kopWords,
       "сумма_базы_формат": formatRubAmount(sum),
       "ставка_формат": formatRate(rate),
     };

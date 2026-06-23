@@ -41,4 +41,11 @@ describe("buildFilename", () => {
     if (r.ok) throw new Error("должно было упасть");
     expect(r.missing).toEqual(["наименование"]);
   });
+
+  it("{time} подставляется через тире (двоеточие в Windows запрещено)", () => {
+    const r = buildFilename("X_{date}_{time}.docx", [], {});
+    if (!r.ok) throw new Error("ожидал ok");
+    expect(r.filename).toMatch(/^X_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.docx$/);
+    expect(r.filename).not.toMatch(/:/);
+  });
 });
