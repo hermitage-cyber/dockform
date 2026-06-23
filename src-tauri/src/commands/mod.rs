@@ -5,5 +5,6 @@ pub mod files;
 pub mod holidays;
 pub mod manifest;
 pub mod network;
+pub mod shortcuts;
 pub mod templates;
 pub mod window;
