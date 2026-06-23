@@ -1,9 +1,13 @@
+import { shiftToNextBusinessDay } from "@/lib/date-utils";
 import { formatRuDate } from "@/lib/format-ru";
 import type { CalculatorDef } from "./types";
 
 /**
  * Просрочка, когда дедлайн задан КОНКРЕТНОЙ ДАТОЙ (а не «N дней от договора»).
  *
+ *   если дедлайн попал на сб/вс/праздник — сдвигаем на ближайший рабочий
+ *   (ст. 193 ГК РФ; применяется и к датам, заданным явно — иначе пеня
+ *   начислится за день, в который обязательство исполнить было невозможно).
  *   дней_просрочки = max(0, дата_фактического_исполнения − дата_дедлайна)
  *
  * Парная развилка к delivery_overdue: оба пишут срок_поставки_истек/дней_просрочки
@@ -15,16 +19,22 @@ export const overdueFromDeadline: CalculatorDef = {
   id: "overdue_from_deadline",
   inputs: ["дата_дедлайна", "дата_фактического_исполнения"],
   outputs: ["дата_дедлайна_формат", "дней_просрочки"],
-  run: (raw) => {
-    const dl = parseDate(raw["дата_дедлайна"]);
+  run: (raw, ctx) => {
+    const rawDeadline = parseDate(raw["дата_дедлайна"]);
     const dFakt = parseDate(raw["дата_фактического_исполнения"]);
+
+    // ctx.holidays отсутствует — переноса не делаем (фолбэк, если holidays.json
+    // не загрузился). См. delivery_overdue для парного поведения.
+    const dl = ctx?.holidays
+      ? shiftToNextBusinessDay(rawDeadline, ctx.holidays)
+      : rawDeadline;
 
     const msPerDay = 86_400_000;
     // ceil — как в delivery_overdue: поставка «следующим утром» = минимум 1 день.
     const overdueDays = Math.max(0, Math.ceil((dFakt.getTime() - dl.getTime()) / msPerDay));
 
     return {
-      // Дедлайн пришёл датой — отдаём его же в формате дд.мм.гггг для .docx.
+      // Дедлайн уже сдвинут (если попал на нерабочий) — отдаём в дд.мм.гггг.
       "дата_дедлайна_формат": formatRuDate(dl),
       "дней_просрочки": overdueDays,
     };
