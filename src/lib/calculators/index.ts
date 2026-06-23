@@ -1,4 +1,9 @@
-import type { CalculatorDef, CalculatorInputs, CalculatorOutputs } from "./types";
+import type {
+  CalculatorContext,
+  CalculatorDef,
+  CalculatorInputs,
+  CalculatorOutputs,
+} from "./types";
 import { deliveryOverdue } from "./delivery-overdue";
 import { overdueFromDeadline } from "./overdue-from-deadline";
 import { penalty44FzPart6 } from "./penalty-44fz-part6";
@@ -31,6 +36,7 @@ export const CALCULATORS: Record<string, CalculatorDef> = {
 export function runCalculator(
   id: string,
   raw: CalculatorInputs,
+  ctx?: CalculatorContext,
 ): CalculatorOutputs | null {
   const def = CALCULATORS[id];
   if (!def) {
@@ -42,11 +48,16 @@ export function runCalculator(
     const v = raw[key];
     if (v == null || v === "") return null;
   }
-  return def.run(raw);
+  return def.run(raw, ctx);
 }
 
 export function getCalculator(id: string): CalculatorDef | undefined {
   return CALCULATORS[id];
 }
 
-export type { CalculatorDef, CalculatorInputs, CalculatorOutputs } from "./types";
+export type {
+  CalculatorContext,
+  CalculatorDef,
+  CalculatorInputs,
+  CalculatorOutputs,
+} from "./types";

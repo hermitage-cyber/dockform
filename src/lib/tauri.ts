@@ -21,6 +21,12 @@ export async function listDictionaries(): Promise<Dictionaries> {
   return await invoke<Dictionaries>("list_dictionaries");
 }
 
+/// Производственный календарь — массив YYYY-MM-DD. Возвращает [] при отсутствии
+/// файла или ошибке парсинга (Rust-side молча падает в [], см. read_holidays).
+export async function readHolidays(): Promise<string[]> {
+  return await invoke<string[]>("read_holidays");
+}
+
 export async function readTemplate(mode: Mode, template: string): Promise<Uint8Array> {
   const bytes = await invoke<number[]>("read_template", { mode, template });
   return new Uint8Array(bytes);

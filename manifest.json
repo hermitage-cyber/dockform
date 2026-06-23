@@ -1,26 +1,27 @@
 {
   "dictionaries": {
-    "deputies.json": "90b1f311059c1a56a5e6e32276148ac222b7be6862e6f9c09fe08539551bef75"
+    "deputies.json": "90b1f311059c1a56a5e6e32276148ac222b7be6862e6f9c09fe08539551bef75",
+    "holidays.json": "ae3cb885c1d0663ba5ce3b7b8019c55b75a271179235da735932c1a3e6e7a831"
   },
   "templates": {
     "documentation/44_tovar_smp_ktru.docx": "31e49d78d394eb63edfaa4148b88e93f2e29c5d69b33a5d6d7f055a7eb273b89",
     "documentation/44_tovar_smp_ktru.yaml": "03fd9620354122e3945b4ed92ebf077151aec4b1180f811127daf367cfd9dc68",
     "documentation/test.docx": "6e81c952417132e43570577f50b4a6a2ed083dd003c4ee7b03be8cd286533478",
     "documentation/test.yaml": "d59600755f8770cb6e38a340c4e565e8f1188c0233b228795133ceaa412ec6e9",
-    "pretenzii/44_аук_1част_пост_претензия.docx": "9e3b75618058997744af9d8f36b2b2d7d663255f9f0255b7335bde73634b6cce",
-    "pretenzii/44_аук_1част_пост_претензия.yaml": "18a7e45f883c791101383ab6cfb8add173e09a96f584880fa35f81f8fa0989bc",
-    "pretenzii/44_аук_2част_пост_претензия.docx": "1504635b7c39461bb9880be7d0c0b956864d521015878fbb62c88f7eaeaccbcf",
-    "pretenzii/44_аук_2част_пост_претензия.yaml": "4d78e006abae71a09ac77326a3e514446e102a7790a5f0126e6bfe3e2a404eb7",
-    "pretenzii/44_аук_3част_пост_претензия.docx": "a7b4e443fbbaf963eb75e3f0cb473bb192c050ee6e62ddb8b0f725472e6f6b83",
-    "pretenzii/44_аук_3част_пост_претензия.yaml": "dcae2fbcae6d22038acb1cd91c36049ce2f5d61a1de9c0a57a131c2f48bc6d70",
-    "pretenzii/44_аук_4част_пост_претензия.docx": "450204f3b9f2f4af6dce71ceca65bcd9855800258c0f6d92726a69e65ec9ebad",
-    "pretenzii/44_аук_4част_пост_претензия.yaml": "3d50174f82f3928fec9ee3da4a00f0fe0f8ac5707bef6cfa95ad461f4fee35a1",
-    "pretenzii/44_аук_единовр_пост_претензия.docx": "bdd3451ac97d06d3ba288e2951e2996f37749c9700eb32f3a0cb68b13a5bc983",
-    "pretenzii/44_аук_единовр_пост_претензия.yaml": "98ab83089a96cf0e18b2b018cc7bfd12a1ac22264d09fddc80953b25093137e6",
+    "pretenzii/44_аук_1част_пост_претензия.docx": "a1c1076b4344fac32843cbfde1ab4498da634b7f2f1741584174faebfbfd58a5",
+    "pretenzii/44_аук_1част_пост_претензия.yaml": "6122fe3514a807ecc306bee57db6c096df773441efdc0d2b15c82e74a7d6e4ee",
+    "pretenzii/44_аук_2част_пост_претензия.docx": "c75c8d3f82b99d2c027fd7a35c9ff1a577a0f6fde8c46de2583e60fc7bdc2c10",
+    "pretenzii/44_аук_2част_пост_претензия.yaml": "595910f42ba86def44604463d4c01c245bb982e4aef6602a930b32515142b2f6",
+    "pretenzii/44_аук_3част_пост_претензия.docx": "5a5bc961999e100e02e06d84be73ad1bbfe5903a872f24452b488bf1e94c8794",
+    "pretenzii/44_аук_3част_пост_претензия.yaml": "12eb167058e4981fbaee715751c91222a7df08b46722976365d7ae9888231ec3",
+    "pretenzii/44_аук_4част_пост_претензия.docx": "825641c6c093a474b4e2e08e247c418b6e3efc0e054077955a2b7c6d19c6b3fd",
+    "pretenzii/44_аук_4част_пост_претензия.yaml": "3108788077f3ab939d3082a3535ffc77ec03412dded93ba4851030490553982d",
+    "pretenzii/44_аук_единовр_пост_претензия.docx": "df0a2bc1e7b27367d92e9dfde600cb640aa9654e2921ae1262f976abf7e76539",
+    "pretenzii/44_аук_единовр_пост_претензия.yaml": "990a0d61f38840e27246e89deee26a2a86f25b5dfb5326ded87335ee63baeb5f",
     "pretenzii/44_аук_единовр_пост_решение.docx": "f050cffa0280a7ca947e6130ae39bdb2e8e1bf016010cc2e344a07d35d74c5c7",
-    "pretenzii/44_аук_единовр_пост_сз_счет.docx": "ac68ee3378b21361de32156105f21ae409f361ffe7858f44629b9cf1e902dfb5",
+    "pretenzii/44_аук_единовр_пост_сз_счет.docx": "774cb9b41f6c74378d2fe5cb02134711f14180e16f0dfb7a020e3753c6603852",
     "pretenzii/44_аук_част_пост_решение.docx": "a93248a819ef0219daab3f21de10131a55a5266ea0cb3582bbdf1c03aaa2bf7c",
-    "pretenzii/44_аук_част_пост_сз_счет.docx": "2c97f98bb82331b1ddf790caadeaa9610d3e2ffa6b45304f1975c3723c49c45c",
+    "pretenzii/44_аук_част_пост_сз_счет.docx": "3a7801f195a9e25cc2389fde0313fab3ce58e580c8979183a609f2668e737cac",
     "pretenzii/_wizard.yaml": "ca26c16623ff09f97ebc3dd94f8d05ebfb91bc77f3bd2be9a03ac3ee2528c195"
   }
 }

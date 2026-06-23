@@ -1,3 +1,4 @@
+import { shiftToNextBusinessDay } from "@/lib/date-utils";
 import { formatRuDate } from "@/lib/format-ru";
 import { numberToWords } from "@/lib/number-to-words";
 import type { CalculatorDef } from "./types";
@@ -6,6 +7,8 @@ import type { CalculatorDef } from "./types";
  * Дедлайн поставки/исполнения и просрочка по договору.
  *
  *   дата_дедлайна = дата_договора + срок_исполнения_дней
+ *   если дедлайн попал на сб/вс/праздник — сдвигаем на ближайший рабочий
+ *   (ст. 193 ГК РФ; набор праздников приходит из dictionaries/holidays.json)
  *   дней_просрочки = max(0, дата_фактического_исполнения − дата_дедлайна)
  *
  * Универсальный — подходит для любого договора с днями-сроком.
@@ -15,7 +18,7 @@ export const deliveryOverdue: CalculatorDef = {
   id: "delivery_overdue",
   inputs: ["дата_договора", "срок_исполнения_дней", "дата_фактического_исполнения"],
   outputs: ["дата_дедлайна", "дней_просрочки", "срок_исполнения_прописью"],
-  run: (raw) => {
+  run: (raw, ctx) => {
     const dDog = parseDate(raw["дата_договора"]);
     const days = Number(raw["срок_исполнения_дней"]);
     const dFakt = parseDate(raw["дата_фактического_исполнения"]);
@@ -27,7 +30,13 @@ export const deliveryOverdue: CalculatorDef = {
       throw new Error("Срок исполнения не может быть отрицательным");
     }
 
-    const dl = addDays(dDog, days);
+    const rawDeadline = addDays(dDog, days);
+    // ctx.holidays отсутствует — переноса не делаем (рабочий день/сб/вс не
+    // различаем). Это режим до пункта 3 «доработок» и фолбэк, если holidays.json
+    // не загрузился.
+    const dl = ctx?.holidays
+      ? shiftToNextBusinessDay(rawDeadline, ctx.holidays)
+      : rawDeadline;
 
     const msPerDay = 86_400_000;
     // ceil — чтобы поставка «следующим утром» давала минимум 1 день просрочки.

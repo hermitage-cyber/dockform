@@ -3,6 +3,7 @@ import { useWatch, type Control, type UseFormSetValue } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { runCalculator, type CalculatorInputs, type CalculatorOutputs } from "@/lib/calculators";
 import type { FormValues } from "@/lib/form-evaluator";
+import { getHolidays } from "@/lib/holidays";
 import type { FieldConfig } from "@/types";
 
 type Props = {
@@ -43,6 +44,20 @@ export function CalculatorField({ field, control, setValue }: Props) {
       : { phase: "incomplete" },
   );
 
+  // Производственный календарь грузится один раз на сессию (см. lib/holidays.ts).
+  // До загрузки калькулятор работает без сдвига — это безопасный фолбэк, который
+  // переключится на корректное значение через ререндер, когда holidays придут.
+  const [holidays, setHolidays] = useState<ReadonlySet<string> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getHolidays().then((h) => {
+      if (!cancelled) setHolidays(h);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     if (misconfigured) return;
     const timer = setTimeout(() => {
@@ -52,7 +67,9 @@ export function CalculatorField({ field, control, setValue }: Props) {
       });
 
       try {
-        const result = runCalculator(field.calculator!, raw);
+        const result = runCalculator(field.calculator!, raw, {
+          holidays: holidays ?? undefined,
+        });
         if (result === null) {
           setState({ phase: "incomplete" });
           // Чистим выходы, чтобы в .docx не уехали значения от прошлых данных,
@@ -79,7 +96,7 @@ export function CalculatorField({ field, control, setValue }: Props) {
     }, RECALC_DEBOUNCE_MS);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedKey, misconfigured]);
+  }, [watchedKey, misconfigured, holidays]);
 
   return (
     <Card>

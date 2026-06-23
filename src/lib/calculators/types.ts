@@ -1,6 +1,16 @@
 export type CalculatorInputs = Record<string, unknown>;
 export type CalculatorOutputs = Record<string, unknown>;
 
+/// Системный контекст, передаваемый в run() поверх пользовательских входов.
+/// Используется для инфраструктурных данных (производственный календарь и т.п.),
+/// которые не приходят из формы и не должны загромождать inputs.
+export type CalculatorContext = {
+  /// Производственный календарь: набор YYYY-MM-DD нерабочих праздничных дней.
+  /// Грузится из dictionaries/holidays.json. Если отсутствует — калькуляторы,
+  /// которые умеют учитывать переносы, работают как раньше (без сдвига).
+  holidays?: ReadonlySet<string>;
+};
+
 /**
  * Определение калькулятора. id — ключ в реестре, по которому YAML на него ссылается.
  *
@@ -19,5 +29,5 @@ export type CalculatorDef = {
   // трактует его как пустой; неуказанный опциональный выход просто не пишется.
   optionalInputs?: readonly string[];
   optionalOutputs?: readonly string[];
-  run: (inputs: CalculatorInputs) => CalculatorOutputs;
+  run: (inputs: CalculatorInputs, ctx?: CalculatorContext) => CalculatorOutputs;
 };
