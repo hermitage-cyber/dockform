@@ -107,6 +107,9 @@ export type UpdateReport = {
   updated: string[];
   removed: string[];
   failed: string[];
+  /// Заполнено, если Rust отменил синхронизацию: манифест требует более свежий
+  /// .exe, чем установлен. Шаблоны на диске остались нетронутыми.
+  app_outdated?: { required: string; current: string };
 };
 
 /// Скачивает manifest.json с GitHub и синхронизирует templates/ + dictionaries/.

@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { Button } from "@/components/ui/button";
 import { UpdaterPrompt } from "@/components/UpdaterPrompt";
+import { VersionBadge } from "@/components/VersionBadge";
 import { ModeSelect } from "@/pages/ModeSelect";
 import { TemplatesList } from "@/pages/TemplatesList";
 import { FormPage } from "@/pages/FormPage";
@@ -40,6 +41,11 @@ function App() {
   // перечитал список с диска.
   const [templatesNonce, setTemplatesNonce] = useState(0);
   const [appUpdate, setAppUpdate] = useState<Update | null>(null);
+  // Манифест требует более свежий .exe — шаблоны намеренно не обновились.
+  const [appOutdated, setAppOutdated] = useState<{
+    required: string;
+    current: string;
+  } | null>(null);
 
   // Данные анкеты режима «претензии» (этап 8). Грузятся при входе в режим.
   const [wizard, setWizard] = useState<WizardConfig | null>(null);
@@ -88,6 +94,9 @@ function App() {
       try {
         const r = await updateTemplates();
         if (cancelled) return;
+        if (r.app_outdated) {
+          setAppOutdated(r.app_outdated);
+        }
         if (r.updated.length > 0 || r.removed.length > 0) {
           setTemplatesNonce((n) => n + 1);
         }
@@ -280,7 +289,14 @@ function App() {
 
   return (
     <>
+      {appOutdated && !blocked && (
+        <OutdatedAppBanner
+          {...appOutdated}
+          onDismiss={() => setAppOutdated(null)}
+        />
+      )}
       {content}
+      <VersionBadge />
       {appUpdate && !blocked && (
         <UpdaterPrompt update={appUpdate} onDismiss={() => setAppUpdate(null)} />
       )}
@@ -289,6 +305,32 @@ function App() {
       )}
       {blocked && <BlockedOverlay message={blocked.message} />}
     </>
+  );
+}
+
+/// Ненавязчивая плашка: новые шаблоны требуют более свежий .exe, поэтому
+/// обновление пропущено. Работать со старыми шаблонами можно — оверлей не
+/// блокирует, но объясняет, почему в списке нет обещанных изменений.
+function OutdatedAppBanner({
+  required,
+  current,
+  onDismiss,
+}: {
+  required: string;
+  current: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="flex items-start gap-3 border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm">
+      <p className="flex-1">
+        Обновите <span className="font-medium">dockform.exe</span>: новые шаблоны
+        требуют версию {required}, у вас {current}. Пока работаем на прежних
+        шаблонах — они исправны.
+      </p>
+      <Button variant="ghost" size="sm" onClick={onDismiss}>
+        Понятно
+      </Button>
+    </div>
   );
 }
 
