@@ -3,7 +3,6 @@
     "deputies.json": "90b1f311059c1a56a5e6e32276148ac222b7be6862e6f9c09fe08539551bef75",
     "holidays.json": "ae3cb885c1d0663ba5ce3b7b8019c55b75a271179235da735932c1a3e6e7a831"
   },
-  "min_app_version": "1.0.0",
   "templates": {
     "documentation/44_tovar_smp_ktru.docx": "31e49d78d394eb63edfaa4148b88e93f2e29c5d69b33a5d6d7f055a7eb273b89",
     "documentation/44_tovar_smp_ktru.yaml": "716f5094adec186c99342556d46ffd8e0b12b0d1fa7e3d6819d534c05250f543",

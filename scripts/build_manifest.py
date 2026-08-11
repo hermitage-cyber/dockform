@@ -5,15 +5,12 @@
 иначе у пользователей обновление не сработает (Rust-updater сравнивает remote-манифест
 с локальным кешем по хешам).
 
-Помимо хешей проставляет `min_app_version` — версию из `package.json`. Приложение
-старее этой версии не подменяет шаблоны у себя на диске, а показывает «обновите
-dockform.exe». Так шаблоны не могут уехать к пилоту раньше сборки, которая умеет их
-обработать (отзыв пилота 2026-08-10: старый .exe + новые .yaml = «лишние ключи» и
-неоткрывающаяся форма).
-
-Значение берётся из package.json, чтобы не поддерживать руками третий источник правды.
-Следствие: подняли версию приложения — все, кто ещё на старой сборке, замирают на
-текущих шаблонах до раздачи нового .exe. Это и есть желаемое поведение.
+Поле `min_app_version` скрипт НЕ проставляет — только переносит из текущего
+manifest.json, если оно там уже есть. Ставится оно руками и редко: см.
+`docs/release.md`, раздел «Гейт совместимости». Автоматическая простановка (версия из
+package.json при каждом прогоне) пробовалась и откачена — она замораживала доставку
+шаблонов у всех, кто ещё не получил новый .exe, включая правки чистого текста, которые
+на старой сборке отработали бы нормально.
 
 Использование:
     python scripts/build_manifest.py
@@ -67,26 +64,31 @@ def collect(base: Path) -> dict[str, str]:
     return out
 
 
-def app_version() -> str:
-    """Версия приложения из package.json.
+def existing_min_app_version() -> str | None:
+    """Значение min_app_version из текущего manifest.json, если оно там есть.
 
-    Она же должна стоять в `src-tauri/Cargo.toml` и `src-tauri/tauri.conf.json` —
-    порядок бампа описан в `docs/release.md`.
+    Скрипт переписывает манифест целиком, поэтому руками выставленное поле надо
+    явно перенести — иначе очередной пересчёт хешей молча снял бы гейт.
     """
-    data = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
-    version = data.get("version")
-    if not isinstance(version, str) or not version:
-        raise SystemExit("package.json: не найдено поле version")
-    return version
+    if not MANIFEST.exists():
+        return None
+    try:
+        data = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    value = data.get("min_app_version")
+    return value if isinstance(value, str) and value else None
 
 
 def main() -> None:
-    version = app_version()
-    manifest = {
-        "min_app_version": version,
+    manifest: dict[str, object] = {
         "templates": collect(ROOT / "templates"),
         "dictionaries": collect(ROOT / "dictionaries"),
     }
+    pinned = existing_min_app_version()
+    if pinned:
+        manifest["min_app_version"] = pinned
+
     MANIFEST.write_text(
         json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
         encoding="utf-8",
@@ -94,7 +96,8 @@ def main() -> None:
 
     sections = {k: v for k, v in manifest.items() if isinstance(v, dict)}
     total = sum(len(s) for s in sections.values())
-    print(f"manifest.json: {total} файлов, min_app_version={version}")
+    gate = f", min_app_version={pinned} (перенесено)" if pinned else ""
+    print(f"manifest.json: {total} файлов{gate}")
     for section, files in sections.items():
         for rel, sha in files.items():
             print(f"  {section}/{rel}  {sha[:12]}…")
