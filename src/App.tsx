@@ -3,7 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { Button } from "@/components/ui/button";
 import { UpdaterPrompt } from "@/components/UpdaterPrompt";
-import { VersionBadge } from "@/components/VersionBadge";
+import { StatusBadge } from "@/components/StatusBadge";
 import { ModeSelect } from "@/pages/ModeSelect";
 import { TemplatesList } from "@/pages/TemplatesList";
 import { FormPage } from "@/pages/FormPage";
@@ -16,6 +16,7 @@ import {
   saveWindowState,
   updateTemplates,
 } from "@/lib/tauri";
+import type { UpdateReport } from "@/lib/tauri";
 import { validateWizard } from "@/lib/wizard-validator";
 import type { Mode, TemplateConfig, WizardAnswers, WizardConfig } from "@/types";
 
@@ -46,6 +47,8 @@ function App() {
     required: string;
     current: string;
   } | null>(null);
+  // Итог фоновой синхронизации шаблонов → индикатор в углу. `null` — ещё идёт.
+  const [syncReport, setSyncReport] = useState<UpdateReport | null>(null);
 
   // Данные анкеты режима «претензии» (этап 8). Грузятся при входе в режим.
   const [wizard, setWizard] = useState<WizardConfig | null>(null);
@@ -94,6 +97,7 @@ function App() {
       try {
         const r = await updateTemplates();
         if (cancelled) return;
+        setSyncReport(r);
         if (r.app_outdated) {
           setAppOutdated(r.app_outdated);
         }
@@ -105,6 +109,11 @@ function App() {
         }
       } catch (e) {
         console.error("[templates] ошибка:", e);
+        // Сама команда упала (не сетевая ошибка — их Rust гасит внутри).
+        // Индикатор не должен остаться в «проверяем» навсегда.
+        if (!cancelled) {
+          setSyncReport({ status: "error", updated: [], removed: [], failed: [] });
+        }
       }
 
       try {
@@ -296,7 +305,7 @@ function App() {
         />
       )}
       {content}
-      <VersionBadge />
+      <StatusBadge report={syncReport} />
       {appUpdate && !blocked && (
         <UpdaterPrompt update={appUpdate} onDismiss={() => setAppUpdate(null)} />
       )}

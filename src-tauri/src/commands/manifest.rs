@@ -74,8 +74,59 @@ pub struct AppOutdated {
     pub current: String,
 }
 
+/// Чем закончилась попытка синхронизации. До появления этого поля «нет сети» и
+/// «всё уже актуально» приходили на фронт одинаково — пустым отчётом, и
+/// отличить их было нельзя.
+#[derive(Serialize, Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SyncStatus {
+    /// Значение по умолчанию, наружу не уезжает: все ветки ставят статус явно.
+    #[default]
+    Unknown,
+    /// Манифест скачан, все файлы сошлись. Шаблоны = то, что лежит в репозитории.
+    Synced,
+    /// GitHub не ответил: нет сети, таймаут или raw.githubusercontent.com режет
+    /// корпоративный фильтр. Работаем на локальных шаблонах — это штатно.
+    Offline,
+    /// Манифест скачан, но часть файлов не доехала (сеть отвалилась посередине,
+    /// не сошёлся хеш). На диске смесь старого и нового — вот это уже плохо.
+    Partial,
+    /// Манифест скачался, но разобрать его не удалось — сломан в репозитории.
+    Error,
+    /// Гейт `min_app_version`: шаблоны требуют более свежий `.exe`.
+    AppOutdated,
+}
+
+/// Время последней УСПЕШНОЙ синхронизации, unix-секунды.
+///
+/// Берём mtime файла кеша: он перезаписывается только когда манифест реально
+/// скачался, так что отдельного состояния хранить не нужно. Форматирует фронт —
+/// в Rust нет chrono, и тащить его ради одной даты незачем.
+fn last_sync_unix() -> Option<u64> {
+    let meta = std::fs::metadata(cache_path().ok()?).ok()?;
+    meta.modified()
+        .ok()?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .map(|d| d.as_secs())
+}
+
+/// Отчёт без синхронизации файлов: только исход и дата прошлого успеха.
+fn status_only(status: SyncStatus) -> UpdateReport {
+    UpdateReport {
+        status,
+        last_sync_unix: last_sync_unix(),
+        ..UpdateReport::default()
+    }
+}
+
 #[derive(Serialize, Default, Debug)]
 pub struct UpdateReport {
+    /// Итог попытки — для индикатора на экране выбора режима.
+    pub status: SyncStatus,
+    /// Когда шаблоны в последний раз успешно сверялись с GitHub.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_sync_unix: Option<u64>,
     /// Файлы, скачанные с GitHub в этот раз (новые или с изменённым содержимым).
     pub updated: Vec<String>,
     /// Файлы, удалённые локально (их больше нет в remote-манифесте).
@@ -262,23 +313,27 @@ pub async fn update_templates() -> Result<UpdateReport, String> {
         Ok(resp) if resp.status().is_success() => match resp.bytes().await {
             Ok(b) => match serde_json::from_slice(&b) {
                 Ok(m) => m,
+                // Манифест доехал, но он битый — это поломка в репозитории, а не
+                // у пилота. Красный: чинить должны мы, и узнать об этом надо сразу.
                 Err(e) => {
                     eprintln!("[updater] bad manifest json: {e}");
-                    return Ok(UpdateReport::default());
+                    return Ok(status_only(SyncStatus::Error));
                 }
             },
             Err(e) => {
                 eprintln!("[updater] body read: {e}");
-                return Ok(UpdateReport::default());
+                return Ok(status_only(SyncStatus::Offline));
             }
         },
+        // Не-200 от raw.githubusercontent.com — чаще всего корпоративный фильтр
+        // или 404 при переименовании ветки. Для пилота это то же «связи нет».
         Ok(resp) => {
             eprintln!("[updater] manifest status: {}", resp.status());
-            return Ok(UpdateReport::default());
+            return Ok(status_only(SyncStatus::Offline));
         }
         Err(e) => {
             eprintln!("[updater] network: {e}");
-            return Ok(UpdateReport::default());
+            return Ok(status_only(SyncStatus::Offline));
         }
     };
 
@@ -292,7 +347,7 @@ pub async fn update_templates() -> Result<UpdateReport, String> {
                 required: remote.min_app_version.unwrap_or_default(),
                 current: app_version().to_string(),
             }),
-            ..UpdateReport::default()
+            ..status_only(SyncStatus::AppOutdated)
         });
     }
 
@@ -324,6 +379,16 @@ pub async fn update_templates() -> Result<UpdateReport, String> {
     .await;
 
     write_cache(&new_cache);
+
+    // Кеш только что перезаписан — mtime и есть «синхронизировано сейчас».
+    report.last_sync_unix = last_sync_unix();
+    // Частичный успех — отдельный статус: на диске оказалась смесь старых и
+    // новых файлов, и это опаснее честного офлайна, где всё согласовано.
+    report.status = if report.failed.is_empty() {
+        SyncStatus::Synced
+    } else {
+        SyncStatus::Partial
+    };
     Ok(report)
 }
 
@@ -386,6 +451,32 @@ mod tests {
         assert!(app_is_compatible(Some("не знаю"), "1.0.0"));
         assert!(app_is_compatible(Some(""), "1.0.0"));
         assert!(app_is_compatible(Some("v2.0.0"), "1.0.0"));
+    }
+
+    /// Строки статусов — контракт с фронтом (`SyncStatus` в src/lib/tauri.ts,
+    /// он же ключ палитры индикатора). Переименование здесь молча погасит
+    /// индикатор, поэтому фиксируем тестом.
+    #[test]
+    fn status_serializes_as_snake_case() {
+        let cases = [
+            (SyncStatus::Synced, "\"synced\""),
+            (SyncStatus::Offline, "\"offline\""),
+            (SyncStatus::Partial, "\"partial\""),
+            (SyncStatus::Error, "\"error\""),
+            (SyncStatus::AppOutdated, "\"app_outdated\""),
+            (SyncStatus::Unknown, "\"unknown\""),
+        ];
+        for (status, expected) in cases {
+            assert_eq!(serde_json::to_string(&status).unwrap(), expected);
+        }
+    }
+
+    /// Пустой отчёт не должен выглядеть как успешная синхронизация.
+    #[test]
+    fn default_report_is_not_synced() {
+        let r = UpdateReport::default();
+        assert_eq!(r.status, SyncStatus::Unknown);
+        assert_eq!(r.last_sync_unix, None);
     }
 
     /// Кеш пишется без min_app_version — поле относится к манифесту, а не к

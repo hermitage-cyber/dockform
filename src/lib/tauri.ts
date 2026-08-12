@@ -103,7 +103,20 @@ export async function fetchKillswitch(): Promise<Killswitch | null> {
   return await invoke<Killswitch | null>("fetch_killswitch");
 }
 
+/// Исход синхронизации шаблонов. Строки задаёт Rust (`SyncStatus` в
+/// `src-tauri/src/commands/manifest.rs`), там же тест на их написание.
+export type SyncStatus =
+  | "unknown"
+  | "synced"
+  | "offline"
+  | "partial"
+  | "error"
+  | "app_outdated";
+
 export type UpdateReport = {
+  status: SyncStatus;
+  /// Unix-секунды последней успешной сверки с GitHub. Нет — сверки не было ни разу.
+  last_sync_unix?: number;
   updated: string[];
   removed: string[];
   failed: string[];
