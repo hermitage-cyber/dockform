@@ -7,7 +7,7 @@ use commands::files::{open_in_explorer, read_template, write_file};
 use commands::holidays::read_holidays;
 use commands::manifest::update_templates;
 use commands::network::fetch_killswitch;
-use commands::shortcuts::ensure_shortcuts;
+use commands::shortcuts::remove_legacy_shortcuts;
 use commands::templates::list_templates;
 use commands::window::{load_window_state, save_window_state};
 use tauri::Manager;
@@ -49,9 +49,9 @@ pub fn run() {
     #[cfg(debug_assertions)]
     ensure_dev_symlinks();
 
-    // Windows-only, release: пересоздаёт .lnk рядом с .exe так, чтобы они
-    // указывали на текущее расположение, а не на ПК сборки. См. shortcuts.rs.
-    ensure_shortcuts();
+    // Windows-only, release: подчищает .lnk от прошлых сборок — от ярлыков
+    // отказались в v1.0.0, запуск только через .exe. См. shortcuts.rs.
+    remove_legacy_shortcuts();
 
     ensure_drafts_dir();
 
