@@ -31,3 +31,27 @@ function toIsoUtc(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 }
+
+/// Прибавляет N рабочих дней к дате: отсчёт идёт СО СЛЕДУЮЩЕГО дня, нерабочие
+/// пропускаются. Соответствует формулировке «не позднее N рабочих дней,
+/// следующих за днём X» — сам день X в счёт не идёт, даже если он рабочий.
+///
+/// Пример: пт 13.02 + 1 рабочий день = пн 16.02 (сб/вс пропущены).
+export function addBusinessDays(
+  d: Date,
+  days: number,
+  holidays: ReadonlySet<string>,
+): Date {
+  if (!Number.isInteger(days) || days < 0) {
+    throw new Error(`Ожидалось неотрицательное целое число дней, получено «${days}»`);
+  }
+  const r = new Date(d.getTime());
+  let left = days;
+  // Та же защита от бесконечного цикла, что и в shiftToNextBusinessDay:
+  // ограничиваем число шагов, а не полагаемся на календарь.
+  for (let i = 0; left > 0 && i < 366 * 2; i++) {
+    r.setUTCDate(r.getUTCDate() + 1);
+    if (!isNonBusinessDay(r, holidays)) left--;
+  }
+  return r;
+}

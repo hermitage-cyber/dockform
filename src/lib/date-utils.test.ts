@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isNonBusinessDay, shiftToNextBusinessDay } from "./date-utils";
+import { addBusinessDays, isNonBusinessDay, shiftToNextBusinessDay } from "./date-utils";
 
 // Чтобы не дублировать набор в каждом тесте — фиксированный календарь под кейсы.
 // 2026-01-01..08 — новогодние, 2026-02-23 — праздник в пн, 2026-03-08 — праздник в вс,
@@ -84,5 +84,44 @@ describe("shiftToNextBusinessDay", () => {
     const before = src.getTime();
     shiftToNextBusinessDay(src, HOLIDAYS);
     expect(src.getTime()).toBe(before);
+  });
+});
+
+describe("addBusinessDays", () => {
+  const none = new Set<string>();
+
+  it("ноль дней возвращает исходную дату", () => {
+    expect(addBusinessDays(utc("2026-02-02"), 0, none)).toEqual(utc("2026-02-02"));
+  });
+
+  it("считает со следующего дня, а не с текущего", () => {
+    // пн + 1 р.д. = вт, а не пн
+    expect(addBusinessDays(utc("2026-02-02"), 1, none)).toEqual(utc("2026-02-03"));
+  });
+
+  it("перепрыгивает выходные", () => {
+    // пт 06.02 + 1 р.д. = пн 09.02
+    expect(addBusinessDays(utc("2026-02-06"), 1, none)).toEqual(utc("2026-02-09"));
+  });
+
+  it("стартует с ближайшего рабочего, если исходная дата нерабочая", () => {
+    // сб 07.02 + 1 р.д. = пн 09.02
+    expect(addBusinessDays(utc("2026-02-07"), 1, none)).toEqual(utc("2026-02-09"));
+  });
+
+  it("пропускает праздники из календаря", () => {
+    const holidays = new Set(["2026-02-03"]);
+    expect(addBusinessDays(utc("2026-02-02"), 1, holidays)).toEqual(utc("2026-02-04"));
+  });
+
+  it("не мутирует исходную дату", () => {
+    const src = utc("2026-02-02");
+    addBusinessDays(src, 5, none);
+    expect(src).toEqual(utc("2026-02-02"));
+  });
+
+  it("отвергает отрицательные и дробные значения", () => {
+    expect(() => addBusinessDays(utc("2026-02-02"), -1, none)).toThrow();
+    expect(() => addBusinessDays(utc("2026-02-02"), 1.5, none)).toThrow();
   });
 });

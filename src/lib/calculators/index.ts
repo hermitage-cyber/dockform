@@ -5,6 +5,7 @@ import type {
   CalculatorOutputs,
 } from "./types";
 import { deliveryOverdue } from "./delivery-overdue";
+import { invoiceTransferDeadline } from "./invoice-transfer-deadline";
 import { overdueFromDeadline } from "./overdue-from-deadline";
 import { penalty44FzPart6 } from "./penalty-44fz-part6";
 import { penalty44FzPartial } from "./penalty-44fz-partial";
@@ -19,6 +20,7 @@ import { penaltyContractDailyPercent } from "./penalty-contract-daily-percent";
  */
 export const CALCULATORS: Record<string, CalculatorDef> = {
   [deliveryOverdue.id]: deliveryOverdue,
+  [invoiceTransferDeadline.id]: invoiceTransferDeadline,
   [overdueFromDeadline.id]: overdueFromDeadline,
   [penalty44FzPart6.id]: penalty44FzPart6,
   [penalty44FzPartial.id]: penalty44FzPartial,
