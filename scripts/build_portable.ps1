@@ -3,9 +3,21 @@
     Собирает папку портабла dockform/ из репозитория.
 
 .DESCRIPTION
-    Заменяет ручной шаг 6 из docs/release.md. Кладёт в dist/dockform/ готовую
-    структуру: .exe, templates/, dictionaries/, пустые cache/ и output/,
-    README.txt. Ярлыки .lnk не создаёт — от них отказались в v1.0.0.
+    Заменяет ручной шаг 6 из docs/release.md. Кладёт готовую структуру (.exe,
+    templates/, dictionaries/, пустые cache/ и output/, README.txt) в
+    versions/<версия>/dockform/ рядом с репозиторием. Ярлыки .lnk не создаёт —
+    от них отказались в v1.0.0.
+
+    Папка versions/ лежит РЯДОМ с репозиторием, а не внутри: сборки не
+    перемешиваются с исходниками и переживают git reset --hard на build-машине.
+    Раскладка накопительная — прошлые версии остаются, можно откатиться на
+    предыдущую раздачу:
+
+        versions/
+        ├── 1.1.0/
+        │   ├── dockform/              ← папка ровно в том виде, как раздаём
+        │   └── dockform_1.1.0.zip
+        └── 1.0.0/ …
 
     Из templates/ и dictionaries/ исключается то же, что игнорирует
     scripts/build_manifest.py: папка old/ (архив старых редакций), файлы .md
@@ -17,7 +29,8 @@
     0.1.0, когда в репозитории уже 1.0.0).
 
 .PARAMETER OutDir
-    Куда класть результат. По умолчанию dist/ в корне репозитория (в .gitignore).
+    Корень для версий. По умолчанию versions/ рядом с репозиторием.
+    Внутри создаётся подпапка с номером версии.
 
 .PARAMETER Zip
     Дополнительно упаковать в dockform_<версия>.zip рядом с папкой.
@@ -28,6 +41,7 @@
 .EXAMPLE
     .\scripts\build_portable.ps1
     .\scripts\build_portable.ps1 -Build -Zip
+    .\scripts\build_portable.ps1 -Build -Zip -OutDir D:\раздача
 #>
 [CmdletBinding()]
 param(
@@ -40,7 +54,9 @@ $ErrorActionPreference = "Stop"
 
 # Корень репозитория — родитель папки scripts/, где лежит этот файл.
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-if (-not $OutDir) { $OutDir = Join-Path $RepoRoot "dist" }
+# Рядом с репозиторием, не внутри: сборки не мешаются с исходниками и не
+# сносятся вместе с рабочей копией.
+if (-not $OutDir) { $OutDir = Join-Path (Split-Path -Parent $RepoRoot) "versions" }
 
 function Fail($msg) {
     Write-Host ""
@@ -121,9 +137,12 @@ if (Test-Path $manifestPath) {
 
 # ─────────── Сборка папки ───────────
 
-$Dest = Join-Path $OutDir "dockform"
+# Каждая версия в своей подпапке: прошлые раздачи остаются на диске.
+$VersionDir = Join-Path $OutDir $Version
+$Dest = Join-Path $VersionDir "dockform"
 if (Test-Path $Dest) {
-    Info "Очищаю $Dest"
+    # Чистим только текущую версию — соседние не трогаем.
+    Info "Пересобираю версию $Version, очищаю $Dest"
     Remove-Item $Dest -Recurse -Force
 }
 New-Item -ItemType Directory -Path $Dest -Force | Out-Null
@@ -178,7 +197,7 @@ Write-Host ""
 Info ("Готово: {0}  ({1:N1} МБ, шаблонов {2}, справочников {3})" -f $Dest, ($size / 1MB), $nTemplates, $nDicts)
 
 if ($Zip) {
-    $zipPath = Join-Path $OutDir ("dockform_{0}.zip" -f $Version)
+    $zipPath = Join-Path $VersionDir ("dockform_{0}.zip" -f $Version)
     if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
     Compress-Archive -Path $Dest -DestinationPath $zipPath
     $zipSize = (Get-Item $zipPath).Length

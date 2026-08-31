@@ -169,8 +169,25 @@ dockform/
 .\scripts\build_portable.ps1 -Zip
 ```
 
-Результат: `dist\dockform\` и `dist\dockform_1.1.0.zip`. Папка `dist/` в `.gitignore`,
-в репозиторий не попадёт.
+Результат ложится в `versions/` **рядом с репозиторием**, каждая версия в своей подпапке:
+
+```
+C:\Projects\dockform2.0\
+├── dockform\                          ← репозиторий
+└── versions\
+    └── 1.1.0\
+        ├── dockform\                  ← готовая папка, её и раздаём
+        └── dockform_1.1.0.zip
+```
+
+Раздавать нужно `versions\1.1.0\dockform\` или zip рядом с ней. Голый
+`src-tauri\target\release\dockform.exe` без `templates/` и `dictionaries/` не заработает.
+
+Прошлые версии не удаляются — можно откатить пилота на предыдущую раздачу, если в свежей
+что-то не так. Скрипт очищает только подпапку текущей версии.
+
+Папка `versions/` лежит вне репозитория намеренно: сборки не мешаются с исходниками, не
+попадают в `git status` и переживают `git reset --hard` на build-машине.
 
 Флаги: `-Build` — сначала выполнить `npm run tauri build` (тогда шаг 4 отдельно не нужен);
 `-Zip` — упаковать архив; `-OutDir` — сложить в другое место.
@@ -196,7 +213,7 @@ dockform/
 Уже сделано флагом `-Zip` на прошлом шаге. Отдельно, если нужно:
 
 ```powershell
-Compress-Archive -Path dist\dockform -DestinationPath dist\dockform_1.1.0.zip
+Compress-Archive -Path ..\versions\1.1.0\dockform -DestinationPath ..\versions\1.1.0\dockform_1.1.0.zip
 ```
 
 Внутри архива должна оказаться одна папка `dockform/` со всем содержимым. Проверить:
