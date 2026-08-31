@@ -56,7 +56,9 @@ pub struct FieldConfig {
     #[serde(default)]
     pub outputs: Option<BTreeMap<String, String>>,
     // display_outputs — какие выходы калькулятора показывать оператору (и в каком
-    // порядке). На .docx не влияет. Если пусто — показываются все.
+    // порядке). На .docx не влияет. Поля нет — показываются все; пустой список —
+    // карточка скрыта целиком (служебный расчёт). Разница между None и Some(vec![])
+    // значима, поэтому именно Option<Vec<_>>, а не Vec<_>.
     #[serde(default)]
     pub display_outputs: Option<Vec<String>>,
     // variant_group — взаимоисключающая развилка калькуляторов: блоки с одним

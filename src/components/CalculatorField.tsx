@@ -98,6 +98,17 @@ export function CalculatorField({ field, control, setValue }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedKey, misconfigured, holidays]);
 
+  // Пустой display_outputs — служебный расчёт: оператору показывать нечего.
+  // Так сделан, например, вывод предмета поставки в падеже: юрист уже выбрал
+  // «Товар» радиокнопкой, и карточка «Предмет род: Товара» была бы шумом.
+  // Ошибки и кривую конфигурацию показываем всё равно — проглотить их молча
+  // хуже, чем показать лишнюю карточку.
+  const serviceOnly =
+    field.display_outputs?.length === 0 &&
+    state.phase !== "error" &&
+    state.phase !== "misconfigured";
+  if (serviceOnly) return null;
+
   return (
     <Card>
       <CardHeader>
