@@ -1,17 +1,17 @@
 ﻿<#
 .SYNOPSIS
-    Собирает папку портабла dockform/ из репозитория.
+    Полный цикл сборки портабла: обновление, сборка, готовая папка, архив.
 
 .DESCRIPTION
-    Заменяет ручной шаг 6 из docs/release.md. Кладёт готовую структуру (.exe,
-    templates/, dictionaries/, пустые cache/ и output/, README.txt) в
-    versions/<версия>/dockform/ рядом с репозиторием. Ярлыки .lnk не создаёт —
-    от них отказались в v1.0.0.
+    Один запуск делает всё, что нужно для раздачи:
 
-    Папка versions/ лежит РЯДОМ с репозиторием, а не внутри: сборки не
-    перемешиваются с исходниками и переживают git reset --hard на build-машине.
-    Раскладка накопительная — прошлые версии остаются, можно откатиться на
-    предыдущую раздачу:
+      1. git pull + npm install (см. «Про lock-файлы» ниже);
+      2. npm run tauri build;
+      3. сверка версии .exe с package.json;
+      4. сборка папки dockform/ с templates/, dictionaries/, cache/, output/, README.txt;
+      5. упаковка в zip.
+
+    Результат — в versions/<версия>/ РЯДОМ с репозиторием, накопительно:
 
         versions/
         ├── 1.1.0/
@@ -19,43 +19,53 @@
         │   └── dockform_1.1.0.zip
         └── 1.0.0/ …
 
-    Из templates/ и dictionaries/ исключается то же, что игнорирует
-    scripts/build_manifest.py: папка old/ (архив старых редакций), файлы .md
-    (заметки разработчика), временные ~$-блокировки Word и скрытые файлы.
-    Иначе пилот получил бы десяток архивных .docx и служебную разметку.
+    Прошлые версии не удаляются — можно откатить пилота на предыдущую раздачу.
+    Папка лежит вне репозитория намеренно: сборки не мешаются с исходниками,
+    не попадают в git status и переживают git reset --hard.
 
-    Перед сборкой сверяет версию .exe с package.json и останавливается при
-    расхождении — это защита от сборки без git pull (типовая ошибка: собрали
-    0.1.0, когда в репозитории уже 1.0.0).
+    Ярлыки .lnk не создаются — от них отказались в v1.0.0.
+
+    Из templates/ и dictionaries/ исключается то же, что игнорирует
+    scripts/build_manifest.py: папка old/, файлы .md, временные ~$-блокировки
+    Word и скрытые файлы. Списки обязаны совпадать, иначе у пилота на диске
+    окажутся файлы, которых нет в манифесте.
+
+    ПРО LOCK-ФАЙЛЫ. Сборка каждый раз переписывает src-tauri/Cargo.lock (а npm —
+    package-lock.json), из-за чего git pull падает с «local changes would be
+    overwritten». На build-машине своего в этих файлах нет, поэтому перед pull
+    скрипт откатывает их к репозиторию. Если изменено что-то ЕЩЁ — pull
+    останавливается и скрипт скажет, что именно мешает: молча затирать чужую
+    работу он не станет.
 
 .PARAMETER OutDir
     Корень для версий. По умолчанию versions/ рядом с репозиторием.
-    Внутри создаётся подпапка с номером версии.
 
-.PARAMETER Zip
-    Дополнительно упаковать в dockform_<версия>.zip рядом с папкой.
+.PARAMETER NoUpdate
+    Пропустить git pull и npm install (собрать из того, что уже лежит).
 
-.PARAMETER Build
-    Сначала выполнить npm run tauri build.
+.PARAMETER NoBuild
+    Не пересобирать .exe, взять готовый из src-tauri/target/release/.
+
+.PARAMETER NoZip
+    Не паковать архив, оставить только папку.
 
 .EXAMPLE
     .\scripts\build_portable.ps1
-    .\scripts\build_portable.ps1 -Build -Zip
-    .\scripts\build_portable.ps1 -Build -Zip -OutDir D:\раздача
+    .\scripts\build_portable.ps1 -NoUpdate -NoBuild
+    .\scripts\build_portable.ps1 -OutDir D:\раздача
 #>
 [CmdletBinding()]
 param(
     [string]$OutDir,
-    [switch]$Zip,
-    [switch]$Build
+    [switch]$NoUpdate,
+    [switch]$NoBuild,
+    [switch]$NoZip
 )
 
 $ErrorActionPreference = "Stop"
 
-# Корень репозитория — родитель папки scripts/, где лежит этот файл.
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-# Рядом с репозиторием, не внутри: сборки не мешаются с исходниками и не
-# сносятся вместе с рабочей копией.
+# Рядом с репозиторием, не внутри.
 if (-not $OutDir) { $OutDir = Join-Path (Split-Path -Parent $RepoRoot) "versions" }
 
 function Fail($msg) {
@@ -63,40 +73,92 @@ function Fail($msg) {
     Write-Host "ОШИБКА: $msg" -ForegroundColor Red
     exit 1
 }
-
-function Info($msg) { Write-Host $msg -ForegroundColor Cyan }
+function Info($msg) { Write-Host ""; Write-Host $msg -ForegroundColor Cyan }
 function Ok($msg)   { Write-Host "  $msg" -ForegroundColor Green }
+function Warn($msg) { Write-Host "  ВНИМАНИЕ: $msg" -ForegroundColor Yellow }
 
-# ─────────── Версия из package.json ───────────
+# Внешние команды пишут прогресс в stderr, а при $ErrorActionPreference = Stop
+# PowerShell 5.1 принимает это за фатальную ошибку. Поэтому вызываем их с
+# временно ослабленной политикой и смотрим на код возврата, а не на stderr.
+function Invoke-Native {
+    param([string]$Exe, [string[]]$Arguments, [string]$What)
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $Exe @Arguments 2>&1 | ForEach-Object { Write-Host "    $_" }
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+    if ($code -ne 0) { Fail "$What — код возврата $code." }
+}
+
+# ─────────── Шаг 1. Обновление ───────────
+
+if (-not $NoUpdate) {
+    Info "Обновляю репозиторий"
+
+    # Lock-файлы переписывает сборка, своего в них на build-машине нет.
+    foreach ($lock in @("src-tauri/Cargo.lock", "package-lock.json")) {
+        $prev = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        & git -C $RepoRoot checkout -- $lock 2>&1 | Out-Null
+        $ErrorActionPreference = $prev
+    }
+
+    # Всё, что осталось изменённым, — не наше дело: не затираем, а показываем.
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $dirty = & git -C $RepoRoot status --porcelain 2>&1
+    $ErrorActionPreference = $prev
+    if ($dirty) {
+        Write-Host ""
+        Write-Host "В рабочей копии есть незакоммиченные изменения:" -ForegroundColor Yellow
+        $dirty | ForEach-Object { Write-Host "    $_" }
+        Fail @"
+git pull их затрёт, поэтому останавливаюсь.
+
+Если правки не нужны (обычный случай на build-машине):
+    git -C "$RepoRoot" reset --hard origin/main
+
+Если нужны — сохрани их, потом запусти скрипт снова.
+Собрать без обновления: -NoUpdate
+"@
+    }
+
+    # --ff-only: на build-машине не должно возникать merge-коммитов.
+    Invoke-Native "git" @("-C", $RepoRoot, "pull", "--ff-only") "git pull"
+    Ok "репозиторий обновлён"
+
+    Info "Ставлю зависимости (npm install)"
+    Push-Location $RepoRoot
+    try { Invoke-Native "npm" @("install") "npm install" } finally { Pop-Location }
+    Ok "зависимости на месте"
+}
+
+# ─────────── Шаг 2. Версия ───────────
+# Читаем ПОСЛЕ pull: версия могла подняться в только что подтянутых коммитах.
 
 $pkgPath = Join-Path $RepoRoot "package.json"
-if (-not (Test-Path $pkgPath)) { Fail "не найден package.json — запускай скрипт из репозитория." }
+if (-not (Test-Path $pkgPath)) { Fail "не найден package.json — скрипт запущен не из репозитория." }
 $Version = (Get-Content $pkgPath -Raw -Encoding UTF8 | ConvertFrom-Json).version
 if (-not $Version) { Fail "в package.json нет поля version." }
 Info "Версия по package.json: $Version"
 
-# ─────────── Сборка (опционально) ───────────
+# ─────────── Шаг 3. Сборка ───────────
 
-if ($Build) {
-    Info "Запускаю npm run tauri build..."
+if (-not $NoBuild) {
+    Info "Собираю приложение (npm run tauri build) — это 3–10 минут"
     Push-Location $RepoRoot
-    try {
-        & npm run tauri build
-        if ($LASTEXITCODE -ne 0) { Fail "npm run tauri build завершился с кодом $LASTEXITCODE." }
-    } finally {
-        Pop-Location
-    }
+    try { Invoke-Native "npm" @("run", "tauri", "build") "npm run tauri build" } finally { Pop-Location }
 }
-
-# ─────────── Проверка .exe ───────────
 
 $ExePath = Join-Path $RepoRoot "src-tauri\target\release\dockform.exe"
 if (-not (Test-Path $ExePath)) {
-    Fail "не найден $ExePath. Сначала собери: npm run tauri build (или запусти скрипт с -Build)."
+    Fail "не найден $ExePath. Убери -NoBuild, чтобы скрипт собрал приложение сам."
 }
 
-# Tauri пишет версию в ресурсы .exe. Сверяем с package.json: если собирали до
-# git pull, здесь будет старый номер, и раздача уедет не той сборкой.
+# Tauri пишет версию в ресурсы .exe. Расхождение = собрано не из этого кода.
 $ExeVersion = (Get-Item $ExePath).VersionInfo.FileVersion
 if ($ExeVersion) {
     $norm = { param($v) ($v.Trim() -split '[.,]')[0..2] -join '.' }
@@ -106,23 +168,20 @@ if ($ExeVersion) {
         Fail @"
 версия .exe ($a) не совпадает с package.json ($b).
 
-Скорее всего сборка сделана до git pull. Выполни:
-    git pull
-    npm install
-    npm run tauri build
+Похоже, .exe собран из старого кода. Запусти скрипт без -NoBuild.
 "@
     }
     Ok ".exe версии $a — совпадает с package.json"
 } else {
-    Write-Host "  ВНИМАНИЕ: не удалось прочитать версию из .exe, пропускаю сверку." -ForegroundColor Yellow
+    Warn "не удалось прочитать версию из .exe, пропускаю сверку."
 }
 
 $exeAge = (Get-Date) - (Get-Item $ExePath).LastWriteTime
 if ($exeAge.TotalHours -gt 24) {
-    Write-Host ("  ВНИМАНИЕ: .exe собран {0:N0} ч назад — точно свежий?" -f $exeAge.TotalHours) -ForegroundColor Yellow
+    Warn ("{0:N0} ч назад собран .exe — точно свежий?" -f $exeAge.TotalHours)
 }
 
-# ─────────── Проверка манифеста ───────────
+# ─────────── Шаг 4. Проверка манифеста ───────────
 
 # Манифест обязан быть новее шаблонов, иначе у пилотов не сработает обновление.
 $manifestPath = Join-Path $RepoRoot "manifest.json"
@@ -131,19 +190,17 @@ if (Test-Path $manifestPath) {
     $newer = Get-ChildItem (Join-Path $RepoRoot "templates"), (Join-Path $RepoRoot "dictionaries") -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\old\\' -and $_.Extension -ne '.md' -and $_.LastWriteTime -gt $manifestTime }
     if ($newer) {
-        Write-Host "  ВНИМАНИЕ: шаблоны новее manifest.json. Выполни: python3 scripts/build_manifest.py" -ForegroundColor Yellow
+        Warn "шаблоны новее manifest.json. Выполни: python3 scripts/build_manifest.py"
     }
 }
 
-# ─────────── Сборка папки ───────────
+# ─────────── Шаг 5. Папка ───────────
 
-# Каждая версия в своей подпапке: прошлые раздачи остаются на диске.
 $VersionDir = Join-Path $OutDir $Version
 $Dest = Join-Path $VersionDir "dockform"
 if (Test-Path $Dest) {
-    # Чистим только текущую версию — соседние не трогаем.
     Info "Пересобираю версию $Version, очищаю $Dest"
-    Remove-Item $Dest -Recurse -Force
+    Remove-Item $Dest -Recurse -Force   # только текущая версия, соседние не трогаем
 }
 New-Item -ItemType Directory -Path $Dest -Force | Out-Null
 
@@ -152,8 +209,6 @@ Info "Собираю $Dest"
 Copy-Item $ExePath (Join-Path $Dest "dockform.exe")
 Ok "dockform.exe"
 
-# Те же исключения, что в scripts/build_manifest.py — списки должны сходиться,
-# иначе на диске у пилота окажутся файлы, которых нет в манифесте.
 function Copy-Assets($name) {
     $srcRoot = Join-Path $RepoRoot $name
     if (-not (Test-Path $srcRoot)) { Fail "не найдена папка $name/." }
@@ -179,8 +234,7 @@ function Copy-Assets($name) {
 $nTemplates = Copy-Assets "templates"
 $nDicts = Copy-Assets "dictionaries"
 
-# Пустые рабочие папки: приложение создаёт их само, но пилоту спокойнее,
-# когда output/ уже есть и видно, куда складываются документы.
+# Приложение создаёт их само, но пилоту спокойнее, когда output/ уже есть.
 New-Item -ItemType Directory -Path (Join-Path $Dest "cache") -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $Dest "output") -Force | Out-Null
 Ok "cache/ и output/ (пустые)"
@@ -190,19 +244,17 @@ if (-not (Test-Path $readmeSrc)) { Fail "не найден docs\portable-README.
 Copy-Item $readmeSrc (Join-Path $Dest "README.txt")
 Ok "README.txt"
 
-# ─────────── Итог ───────────
+# ─────────── Шаг 6. Архив и итог ───────────
 
 $size = (Get-ChildItem $Dest -Recurse -File | Measure-Object -Property Length -Sum).Sum
-Write-Host ""
 Info ("Готово: {0}  ({1:N1} МБ, шаблонов {2}, справочников {3})" -f $Dest, ($size / 1MB), $nTemplates, $nDicts)
 
-if ($Zip) {
+if (-not $NoZip) {
     $zipPath = Join-Path $VersionDir ("dockform_{0}.zip" -f $Version)
     if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
     Compress-Archive -Path $Dest -DestinationPath $zipPath
-    $zipSize = (Get-Item $zipPath).Length
-    Info ("Архив:  {0}  ({1:N1} МБ)" -f $zipPath, ($zipSize / 1MB))
+    Info ("Архив:  {0}  ({1:N1} МБ)" -f $zipPath, ((Get-Item $zipPath).Length / 1MB))
 }
 
 Write-Host ""
-Write-Host "Дальше: проверь запуск .exe из собранной папки, потом раздавай (docs/release.md, шаг 8)."
+Write-Host "Дальше: запусти .exe из собранной папки и проверь, потом раздавай (docs/release.md, шаг 8)."
