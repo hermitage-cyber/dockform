@@ -8,7 +8,7 @@
       1. git pull + npm install (см. «Про lock-файлы» ниже);
       2. npm run tauri build;
       3. сверка версии .exe с package.json;
-      4. сборка папки dockform/ с templates/, dictionaries/, cache/, output/, README.txt;
+      4. сборка папки dockform/ с templates/, dictionaries/, cache/, output/;
       5. упаковка в zip.
 
     Результат — в versions/<версия>/ РЯДОМ с репозиторием, накопительно:
@@ -239,10 +239,9 @@ New-Item -ItemType Directory -Path (Join-Path $Dest "cache") -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $Dest "output") -Force | Out-Null
 Ok "cache/ и output/ (пустые)"
 
-$readmeSrc = Join-Path $RepoRoot "docs\portable-README.txt"
-if (-not (Test-Path $readmeSrc)) { Fail "не найден docs\portable-README.txt." }
-Copy-Item $readmeSrc (Join-Path $Dest "README.txt")
-Ok "README.txt"
+# README в папку НЕ кладём — решение от 2026-08-31. Инструкция для конечного
+# пользователя осталась в docs/portable-README.txt, но пилотам она отдаётся
+# отдельно, а не файлом рядом с .exe.
 
 # ─────────── Шаг 6. Архив и итог ───────────
 

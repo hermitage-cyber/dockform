@@ -157,7 +157,6 @@ src-tauri/target/release/dockform.exe
 ```
 dockform/
 ├── dockform.exe
-├── README.txt                (копия docs/portable-README.txt)
 ├── templates/
 │   ├── pretenzii/
 │   └── documentation/
@@ -213,7 +212,7 @@ C:\Projects\dockform2.0\
 
 Если по какой-то причине надо руками: создать `dockform/`, положить `dockform.exe` из
 `src-tauri/target/release/`, скопировать `templates/` и `dictionaries/` (без `old/` и `.md`),
-создать пустые `cache/` и `output/`, положить `docs/portable-README.txt` как `README.txt`.
+создать пустые `cache/` и `output/`.
 
 ### Шаг 7. Упаковать в zip
 
@@ -245,7 +244,7 @@ dir проверка\dockform
   сборки, программа удалит сама — пользоваться ими больше не нужно.
 - В правом нижнем углу — версия и кружок состояния шаблонов. Просить скриншот
   вместе с этим углом, если что-то пойдёт не так.
-- Если программа не открывается — см. `README.txt` в папке.
+- Если программа не открывается — чаще всего не хватает WebView2, он ставится сам при первом запуске; при неудаче поставить вручную с сайта Microsoft.
 
 ### Шаг 9. Создать тег в репозитории
 
@@ -276,7 +275,7 @@ gh release create v1.0.0 dockform_1.1.0.zip \
 - [ ] Изменения запушены в main.
 - [ ] Собранный `dockform.exe` запускается в чистой папке с `templates/` и `dictionaries/`.
 - [ ] Прогнан `build.cmd` — папка и архив собраны, скрипт не ругнулся на версию `.exe`.
-- [ ] В собранной папке нет `templates/pretenzii/old/`, `.md`-файлов и `.lnk`.
+- [ ] В собранной папке нет `templates/pretenzii/old/`, `.md`-файлов, `.lnk` и `README.txt`.
 - [ ] Тег `vX.Y.Z` создан и запушен.
 - [ ] Архив доставлен пилотному пользователю, обратная связь получена.
 
