@@ -1,4 +1,4 @@
-import { shiftToNextBusinessDay } from "@/lib/date-utils";
+import { addBusinessDays, shiftToNextBusinessDay } from "@/lib/date-utils";
 import { formatRuDate } from "@/lib/format-ru";
 import { numberToWords } from "@/lib/number-to-words";
 import type { CalculatorDef } from "./types";
@@ -11,12 +11,24 @@ import type { CalculatorDef } from "./types";
  *   (ст. 193 ГК РФ; набор праздников приходит из dictionaries/holidays.json)
  *   дней_просрочки = max(0, дата_фактического_исполнения − дата_дедлайна)
  *
+ * Срок считается календарными днями либо рабочими — по входу «тип_дней».
+ * Вход опциональный: его отсутствие означает календарные, как было до
+ * появления выбора, поэтому старые .yaml продолжают работать без правок.
+ * При рабочих днях перенос дедлайна не нужен — отсчёт и так завершается
+ * на рабочем дне.
+ *
  * Универсальный — подходит для любого договора с днями-сроком.
  * Поля даты приходят строками YYYY-MM-DD (тип input=date).
  */
 export const deliveryOverdue: CalculatorDef = {
   id: "delivery_overdue",
-  inputs: ["дата_договора", "срок_исполнения_дней", "дата_фактического_исполнения"],
+  inputs: [
+    "дата_договора",
+    "срок_исполнения_дней",
+    "дата_фактического_исполнения",
+    "тип_дней",
+  ],
+  optionalInputs: ["тип_дней"],
   outputs: ["дата_дедлайна", "дней_просрочки", "срок_исполнения_прописью"],
   run: (raw, ctx) => {
     const dDog = parseDate(raw["дата_договора"]);
@@ -30,13 +42,23 @@ export const deliveryOverdue: CalculatorDef = {
       throw new Error("Срок исполнения не может быть отрицательным");
     }
 
-    const rawDeadline = addDays(dDog, days);
-    // ctx.holidays отсутствует — переноса не делаем (рабочий день/сб/вс не
-    // различаем). Это режим до пункта 3 «доработок» и фолбэк, если holidays.json
-    // не загрузился.
-    const dl = ctx?.holidays
-      ? shiftToNextBusinessDay(rawDeadline, ctx.holidays)
-      : rawDeadline;
+    // «Рабочие» — единственное значение, включающее рабочий отсчёт; всё
+    // остальное (пусто, «Календарные») трактуем как календарные дни.
+    const businessMode = String(raw["тип_дней"] ?? "").trim() === "Рабочие";
+
+    let dl: Date;
+    if (businessMode) {
+      // Отсчёт рабочих дней уже заканчивается на рабочем дне — сдвигать нечего.
+      // Без календаря праздников пропускаются только суббота и воскресенье.
+      dl = addBusinessDays(dDog, days, ctx?.holidays ?? new Set());
+    } else {
+      const rawDeadline = addDays(dDog, days);
+      // ctx.holidays отсутствует — переноса не делаем (рабочий день/сб/вс не
+      // различаем). Это фолбэк, если holidays.json не загрузился.
+      dl = ctx?.holidays
+        ? shiftToNextBusinessDay(rawDeadline, ctx.holidays)
+        : rawDeadline;
+    }
 
     const msPerDay = 86_400_000;
     // ceil — чтобы поставка «следующим утром» давала минимум 1 день просрочки.
