@@ -28,17 +28,23 @@ pub struct CombinedFiles {
 #[cfg_attr(not(windows), allow(dead_code))]
 const SCRIPT: &str = r#"
 $ErrorActionPreference = 'Stop'
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+# Иначе PowerShell пишет в stderr служебный прогресс в формате CLIXML.
+$ProgressPreference = 'SilentlyContinue'
 $dir = $env:DOCKFORM_COMBINE_DIR
 $count = [int]$env:DOCKFORM_COMBINE_PARTS
+$errFile = Join-Path $dir 'error.txt'
+function Fail([string]$msg) {
+  [System.IO.File]::WriteAllText($errFile, $msg, (New-Object System.Text.UTF8Encoding $false))
+}
 $word = $null
 $own = $false
 $doc = $null
+$step = 'запуск Word'
 try {
   try {
     $word = New-Object -ComObject Word.Application
   } catch {
-    [Console]::Error.WriteLine('Microsoft Word не найден')
+    Fail 'Microsoft Word не найден'
     exit 2
   }
   # Если Word уже был открыт у пользователя, COM может вернуть его экземпляр:
@@ -46,9 +52,11 @@ try {
   $own = ($word.Documents.Count -eq 0)
   if ($own) { $word.Visible = $false }
   $word.DisplayAlerts = 0
+  $step = 'открытие документа 1'
   $doc = $word.Documents.Open((Join-Path $dir 'part1.docx'), $false, $false, $false)
   for ($i = 2; $i -le $count; $i++) {
     $file = Join-Path $dir "part$i.docx"
+    $step = "чтение полей документа $i"
     $src = $word.Documents.Open($file, $false, $true, $false)
     $ps = $src.PageSetup
     # ordered: ориентация раньше размеров, иначе Word переставит ширину и высоту.
@@ -61,15 +69,22 @@ try {
     $src.Saved = $true
     $src.Close()
 
-    $r = $doc.Content
-    $r.Collapse(0)        # wdCollapseEnd
-    $r.InsertBreak(2)     # wdSectionBreakNextPage
-    $r = $doc.Content
-    $r.Collapse(0)
+    # Точка в конце основного текста, перед последним знаком абзаца, — явной
+    # позицией, а не Collapse: через COM из PowerShell аргумент Collapse может
+    # не дойти, и вставка уйдёт в начало документа, в абзац с логотипом бланка.
+    $step = "разрыв раздела перед документом $i"
+    $e = $doc.Content.End - 1
+    $r = $doc.Range($e, $e)
+    $r.InsertBreak(2)      # wdSectionBreakNextPage
+    $step = "вставка документа $i"
+    $e = $doc.Content.End - 1
+    $r = $doc.Range($e, $e)
     $r.InsertFile($file)
 
     $sec = $doc.Sections.Item($doc.Sections.Count)
+    $step = "поля страницы документа $i"
     foreach ($k in $setup.Keys) { $sec.PageSetup.$k = $setup[$k] }
+    $step = "колонтитулы документа $i"
     for ($h = 1; $h -le 3; $h++) {
       foreach ($hf in @($sec.Headers.Item($h), $sec.Footers.Item($h))) {
         $hf.LinkToPrevious = $false
@@ -77,11 +92,13 @@ try {
       }
     }
   }
+  $step = 'сохранение .docx'
   $out = Join-Path $dir 'out.docx'
   try { $doc.SaveAs2($out, 16) } catch { $doc.SaveAs([ref]$out, [ref]16) }   # wdFormatDocumentDefault
+  $step = 'сохранение PDF'
   $doc.ExportAsFixedFormat((Join-Path $dir 'out.pdf'), 17)                    # wdExportFormatPDF
 } catch {
-  [Console]::Error.WriteLine($_.Exception.Message)
+  Fail ("шаг «$step»: " + $_.Exception.Message)
   exit 1
 } finally {
   if ($doc) { $doc.Saved = $true; $doc.Close() }
@@ -188,10 +205,22 @@ fn run_word(work: &Path, count: usize) -> Result<(), String> {
         }
         std::thread::sleep(Duration::from_millis(200));
     };
-    let err = reader.join().unwrap_or_default();
+    let stderr_text = reader.join().unwrap_or_default();
 
     if !status.success() {
-        return Err(if err.is_empty() { format!("Word завершился с кодом {status}") } else { err });
+        // Причину скрипт пишет в error.txt. stderr — запасной канал: PowerShell
+        // кладёт туда и служебный CLIXML, показывать его оператору бессмысленно.
+        let from_file = std::fs::read_to_string(work.join("error.txt"))
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
+        let reason = if !from_file.is_empty() {
+            from_file
+        } else if !stderr_text.is_empty() && !stderr_text.starts_with("#< CLIXML") {
+            stderr_text
+        } else {
+            format!("Word завершился с кодом {}", status.code().unwrap_or(-1))
+        };
+        return Err(reason);
     }
     if !work.join("out.docx").exists() || !work.join("out.pdf").exists() {
         return Err("Word не создал файлы".into());
