@@ -137,7 +137,7 @@ pub struct TemplateConfig {
     #[serde(default)]
     pub extra_templates: Option<Vec<ExtraTemplate>>,
     /// Один общий .docx + PDF из всех документов пакета вместо отдельных файлов
-    /// (отзыв 2026-10-12). pattern — имя без расширения. См. commands/combine.rs.
+    /// (отзыв 2026-10-12). pattern — имя без расширения. Склейка — src/lib/docx-merge.ts, PDF — commands/pdf.rs.
     #[serde(default)]
     pub combined_output: Option<OutputFilename>,
     /// Заполняется Rust'ом: ID шаблона (= имя yaml без расширения). На фронте используется как ключ.

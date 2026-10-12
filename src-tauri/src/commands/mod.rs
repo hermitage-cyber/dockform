@@ -1,11 +1,11 @@
 pub mod app;
-pub mod combine;
 pub mod dictionaries;
 pub mod drafts;
 pub mod files;
 pub mod holidays;
 pub mod manifest;
 pub mod network;
+pub mod pdf;
 pub mod shortcuts;
 pub mod templates;
 pub mod window;

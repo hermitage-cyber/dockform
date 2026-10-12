@@ -36,18 +36,10 @@ export async function writeFile(path: string, bytes: Uint8Array): Promise<void> 
   await invoke("write_file", { path, bytes: Array.from(bytes) });
 }
 
-/// Склеивает документы (по порядку) в `<outDir>/<baseName>.docx` и `.pdf` через
-/// Microsoft Word. Бросает строку-причину, если Word нет или он упал.
-export async function combineDocuments(
-  parts: Uint8Array[],
-  outDir: string,
-  baseName: string,
-): Promise<{ docx: string; pdf: string }> {
-  return await invoke("combine_documents", {
-    parts: parts.map((p) => Array.from(p)),
-    outDir,
-    baseName,
-  });
+/// Сохраняет готовый .docx как `<outDir>/<baseName>.pdf` через Microsoft Word.
+/// Бросает строку-причину, если Word нет или он упал.
+export async function exportPdf(docx: Uint8Array, outDir: string, baseName: string): Promise<string> {
+  return await invoke("export_pdf", { docx: Array.from(docx), outDir, baseName });
 }
 
 export async function openInExplorer(path: string): Promise<void> {

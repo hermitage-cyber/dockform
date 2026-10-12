@@ -16,7 +16,8 @@ import { DynamicForm } from "@/components/DynamicForm";
 import { validateTemplate } from "@/lib/template-validator";
 import { formatValuesForDocx } from "@/lib/format-ru";
 import { buildCombinedName, FilenameFieldsError, generateBundle } from "@/lib/generator";
-import { combineDocuments, deleteDraft, draftKey, openInExplorer, writeFile } from "@/lib/tauri";
+import { mergeDocx } from "@/lib/docx-merge";
+import { deleteDraft, draftKey, exportPdf, openInExplorer, writeFile } from "@/lib/tauri";
 import type { FormValues } from "@/lib/form-evaluator";
 import type { Mode, TemplateConfig } from "@/types";
 
@@ -85,23 +86,29 @@ export function FormPage({ mode, template, onBack, onNewTemplate }: Props) {
       if (totalDocs > 1) {
         const dir = await open({ directory: true });
         if (typeof dir !== "string") return; // отмена
-        // Общий файл собирает Word. Не вышло — сохраняем документы по
-        // отдельности, чтобы заполненная форма не пропала.
+        // Общий .docx склеиваем сами, PDF печатает Word. Не склеилось —
+        // сохраняем документы по отдельности; нет PDF — общий .docx всё равно сохранён.
         let warning: string | undefined;
         if (combined && combinedName) {
+          let merged: Uint8Array | null = null;
           try {
-            await combineDocuments(files.map((f) => f.bytes), dir, combinedName);
-            await deleteDraft(key).catch(() => undefined);
-            setSaved({
-              kind: "bundle",
-              dir,
-              names: [`${combinedName}.docx`, `${combinedName}.pdf`],
-              combined: true,
-            });
-            return;
+            merged = mergeDocx(files.map((f) => f.bytes));
           } catch (e) {
             const count = files.length === 3 ? "три" : String(files.length);
-            warning = `Не удалось собрать общий файл через Word: ${extractError(e)}. Сохранены ${count} отдельных документа.`;
+            warning = `Не удалось собрать общий файл: ${extractError(e)}. Сохранены ${count} отдельных документа.`;
+          }
+          if (merged) {
+            await writeFile(await join(dir, `${combinedName}.docx`), merged);
+            const names = [`${combinedName}.docx`];
+            try {
+              await exportPdf(merged, dir, combinedName);
+              names.push(`${combinedName}.pdf`);
+            } catch (e) {
+              warning = `Не удалось сохранить PDF через Word: ${extractError(e)}. Общий документ .docx сохранён.`;
+            }
+            await deleteDraft(key).catch(() => undefined);
+            setSaved({ kind: "bundle", dir, names, combined: true, warning });
+            return;
           }
         }
         for (const f of files) {
@@ -193,7 +200,9 @@ export function FormPage({ mode, template, onBack, onNewTemplate }: Props) {
             <DialogTitle>
               {saved?.kind === "bundle"
                 ? saved.combined
-                  ? "Документ и PDF сохранены"
+                  ? saved.names.length > 1
+                    ? "Документ и PDF сохранены"
+                    : "Документ сохранён"
                   : `Создано ${saved.names.length} файлов`
                 : "Документ сохранён"}
             </DialogTitle>

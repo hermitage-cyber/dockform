@@ -1,37 +1,24 @@
-//! Общий .docx + PDF из нескольких документов пакета (отзыв пилота 2026-10-12).
-//!
-//! Склейку и PDF делает Microsoft Word на машине оператора: COM через PowerShell.
-//! Склеивать .docx самим — значит сводить стили, нумерацию и разделы разных файлов
-//! вручную; Word делает это корректно, а PDF без него на Windows не получить вовсе.
-//! Если Word нет или он упал — фронт сохраняет документы по отдельности.
+//! PDF из готового .docx через Microsoft Word на машине оператора (отзыв пилота
+//! 2026-10-12): COM через PowerShell. Сам общий .docx собирает фронт
+//! (`src/lib/docx-merge.ts`) — Word здесь только открывает файл и печатает в PDF.
+//! Склеивать через Word (InsertFile) пробовали: на машине пилота он отказался
+//! задавать вставленному разделу поля страницы.
 
-use serde::Serialize;
 use std::path::{Path, PathBuf};
 
 /// Больше — значит Word завис (диалог, лицензия, повреждённый профиль).
 #[cfg_attr(not(windows), allow(dead_code))]
 const WORD_TIMEOUT_SECS: u64 = 120;
 
-#[derive(Serialize)]
-pub struct CombinedFiles {
-    pub docx: String,
-    pub pdf: String,
-}
-
-/// Скрипт для Word. Пути — через переменные окружения: так кириллица и пробелы
-/// в пути к .exe не проходят через экранирование командной строки.
-///
-/// Каждый следующий документ вставляется в новый раздел. Word при вставке отдаёт
-/// разделу поля и колонтитулы предыдущего, поэтому поля читаются из исходного
-/// файла части и ставятся явно, а колонтитулы отвязываются и очищаются — иначе
-/// бланк претензии (адрес Эрмитажа в нижнем колонтитуле) уедет на СЗ и решение.
+/// Скрипт для Word. Путь — через переменную окружения: так кириллица и пробелы
+/// в пути к .exe не проходят через экранирование командной строки. Причину
+/// сбоя пишет в error.txt с названием шага — по скриншоту видно, где упало.
 #[cfg_attr(not(windows), allow(dead_code))]
 const SCRIPT: &str = r#"
 $ErrorActionPreference = 'Stop'
 # Иначе PowerShell пишет в stderr служебный прогресс в формате CLIXML.
 $ProgressPreference = 'SilentlyContinue'
-$dir = $env:DOCKFORM_COMBINE_DIR
-$count = [int]$env:DOCKFORM_COMBINE_PARTS
+$dir = $env:DOCKFORM_PDF_DIR
 $errFile = Join-Path $dir 'error.txt'
 function Fail([string]$msg) {
   [System.IO.File]::WriteAllText($errFile, $msg, (New-Object System.Text.UTF8Encoding $false))
@@ -52,51 +39,10 @@ try {
   $own = ($word.Documents.Count -eq 0)
   if ($own) { $word.Visible = $false }
   $word.DisplayAlerts = 0
-  $step = 'открытие документа 1'
-  $doc = $word.Documents.Open((Join-Path $dir 'part1.docx'), $false, $false, $false)
-  for ($i = 2; $i -le $count; $i++) {
-    $file = Join-Path $dir "part$i.docx"
-    $step = "чтение полей документа $i"
-    $src = $word.Documents.Open($file, $false, $true, $false)
-    $ps = $src.PageSetup
-    # ordered: ориентация раньше размеров, иначе Word переставит ширину и высоту.
-    $setup = [ordered]@{
-      Orientation = $ps.Orientation; PageWidth = $ps.PageWidth; PageHeight = $ps.PageHeight
-      TopMargin = $ps.TopMargin; BottomMargin = $ps.BottomMargin
-      LeftMargin = $ps.LeftMargin; RightMargin = $ps.RightMargin
-      HeaderDistance = $ps.HeaderDistance; FooterDistance = $ps.FooterDistance
-    }
-    $src.Saved = $true
-    $src.Close()
-
-    # Точка в конце основного текста, перед последним знаком абзаца, — явной
-    # позицией, а не Collapse: через COM из PowerShell аргумент Collapse может
-    # не дойти, и вставка уйдёт в начало документа, в абзац с логотипом бланка.
-    $step = "разрыв раздела перед документом $i"
-    $e = $doc.Content.End - 1
-    $r = $doc.Range($e, $e)
-    $r.InsertBreak(2)      # wdSectionBreakNextPage
-    $step = "вставка документа $i"
-    $e = $doc.Content.End - 1
-    $r = $doc.Range($e, $e)
-    $r.InsertFile($file)
-
-    $sec = $doc.Sections.Item($doc.Sections.Count)
-    $step = "поля страницы документа $i"
-    foreach ($k in $setup.Keys) { $sec.PageSetup.$k = $setup[$k] }
-    $step = "колонтитулы документа $i"
-    for ($h = 1; $h -le 3; $h++) {
-      foreach ($hf in @($sec.Headers.Item($h), $sec.Footers.Item($h))) {
-        $hf.LinkToPrevious = $false
-        $hf.Range.Delete() | Out-Null
-      }
-    }
-  }
-  $step = 'сохранение .docx'
-  $out = Join-Path $dir 'out.docx'
-  try { $doc.SaveAs2($out, 16) } catch { $doc.SaveAs([ref]$out, [ref]16) }   # wdFormatDocumentDefault
+  $step = 'открытие документа'
+  $doc = $word.Documents.Open((Join-Path $dir 'in.docx'), $false, $true, $false)
   $step = 'сохранение PDF'
-  $doc.ExportAsFixedFormat((Join-Path $dir 'out.pdf'), 17)                    # wdExportFormatPDF
+  $doc.ExportAsFixedFormat((Join-Path $dir 'out.pdf'), 17)    # wdExportFormatPDF
 } catch {
   Fail ("шаг «$step»: " + $_.Exception.Message)
   exit 1
@@ -113,50 +59,34 @@ fn exe_dir() -> Result<PathBuf, String> {
         .ok_or_else(|| "executable has no parent".to_string())
 }
 
-/// Склеивает `parts` (байты .docx по порядку) в `<out_dir>/<base_name>.docx` и
-/// `.pdf`. Части и результат Word пишет во временную папку в `cache/` рядом с
-/// .exe под ASCII-именами; в папку пользователя файлы копируются уже готовыми.
+/// Сохраняет `docx` как `<out_dir>/<base_name>.pdf` и возвращает путь к PDF.
+/// Word работает во временной папке в `cache/` рядом с .exe с ASCII-именами;
+/// готовый PDF копируется в папку пользователя.
 #[tauri::command]
-pub async fn combine_documents(
-    parts: Vec<Vec<u8>>,
-    out_dir: String,
-    base_name: String,
-) -> Result<CombinedFiles, String> {
-    if parts.len() < 2 {
-        return Err("нечего склеивать".into());
-    }
+pub async fn export_pdf(docx: Vec<u8>, out_dir: String, base_name: String) -> Result<String, String> {
     if base_name.is_empty() || base_name.contains(['/', '\\']) || base_name.contains("..") {
         return Err("недопустимое имя файла".into());
     }
-    tauri::async_runtime::spawn_blocking(move || combine_blocking(parts, &out_dir, &base_name))
+    tauri::async_runtime::spawn_blocking(move || export_blocking(&docx, &out_dir, &base_name))
         .await
         .map_err(|e| e.to_string())?
 }
 
-fn combine_blocking(parts: Vec<Vec<u8>>, out_dir: &str, base_name: &str) -> Result<CombinedFiles, String> {
+fn export_blocking(docx: &[u8], out_dir: &str, base_name: &str) -> Result<String, String> {
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
-    let work = exe_dir()?.join("cache").join("combine").join(format!("{stamp}-{}", std::process::id()));
+    let work = exe_dir()?.join("cache").join("pdf").join(format!("{stamp}-{}", std::process::id()));
     std::fs::create_dir_all(&work).map_err(|e| format!("временная папка: {e}"))?;
 
     let result = (|| {
-        for (i, bytes) in parts.iter().enumerate() {
-            std::fs::write(work.join(format!("part{}.docx", i + 1)), bytes)
-                .map_err(|e| format!("временный файл: {e}"))?;
-        }
-        run_word(&work, parts.len())?;
-
-        let dest_docx = Path::new(out_dir).join(format!("{base_name}.docx"));
-        let dest_pdf = Path::new(out_dir).join(format!("{base_name}.pdf"));
+        std::fs::write(work.join("in.docx"), docx).map_err(|e| format!("временный файл: {e}"))?;
+        run_word(&work)?;
+        let dest = Path::new(out_dir).join(format!("{base_name}.pdf"));
         // copy, а не rename: папка пользователя может быть на другом диске.
-        std::fs::copy(work.join("out.docx"), &dest_docx).map_err(|e| format!("запись .docx: {e}"))?;
-        std::fs::copy(work.join("out.pdf"), &dest_pdf).map_err(|e| format!("запись .pdf: {e}"))?;
-        Ok(CombinedFiles {
-            docx: dest_docx.to_string_lossy().into_owned(),
-            pdf: dest_pdf.to_string_lossy().into_owned(),
-        })
+        std::fs::copy(work.join("out.pdf"), &dest).map_err(|e| format!("запись PDF: {e}"))?;
+        Ok(dest.to_string_lossy().into_owned())
     })();
 
     let _ = std::fs::remove_dir_all(&work);
@@ -164,7 +94,7 @@ fn combine_blocking(parts: Vec<Vec<u8>>, out_dir: &str, base_name: &str) -> Resu
 }
 
 #[cfg(windows)]
-fn run_word(work: &Path, count: usize) -> Result<(), String> {
+fn run_word(work: &Path) -> Result<(), String> {
     use std::io::Read;
     use std::os::windows::process::CommandExt;
     use std::process::{Command, Stdio};
@@ -176,8 +106,7 @@ fn run_word(work: &Path, count: usize) -> Result<(), String> {
     // которую в корпоративной сети часто зажимают групповой политикой.
     let mut child = Command::new("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-EncodedCommand", &encode_command(SCRIPT)])
-        .env("DOCKFORM_COMBINE_DIR", work)
-        .env("DOCKFORM_COMBINE_PARTS", count.to_string())
+        .env("DOCKFORM_PDF_DIR", work)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
@@ -222,14 +151,14 @@ fn run_word(work: &Path, count: usize) -> Result<(), String> {
         };
         return Err(reason);
     }
-    if !work.join("out.docx").exists() || !work.join("out.pdf").exists() {
-        return Err("Word не создал файлы".into());
+    if !work.join("out.pdf").exists() {
+        return Err("Word не создал PDF".into());
     }
     Ok(())
 }
 
 #[cfg(not(windows))]
-fn run_word(_work: &Path, _count: usize) -> Result<(), String> {
+fn run_word(_work: &Path) -> Result<(), String> {
     Err("доступно только в Windows с Microsoft Word".into())
 }
 
