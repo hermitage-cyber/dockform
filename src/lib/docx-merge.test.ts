@@ -89,6 +89,24 @@ describe("mergeDocx", () => {
     expect(memo).toMatch(/<w:spacing[^>]*w:line="259"/);
   });
 
+  it("стиль таблицы СЗ переносится под новым id, а не подменяется стилем претензии", () => {
+    // У СЗ «a3» — «Table Grid» (рамка, интервал 0), у претензии «a3» — другой стиль.
+    const merged = mergeDocx(BUNDLES[0].map(render));
+    const doc = xmlOf(merged, "word/document.xml");
+    const styles = xmlOf(merged, "word/styles.xml");
+    // СЗ начинается сразу после разрыва раздела претензии.
+    const memo = doc.slice(doc.indexOf("</w:sectPr>"));
+    const tblStyle = /<w:tblStyle w:val="([^"]*)"/.exec(memo)![1];
+    expect(tblStyle).toBe("a3D2");
+    const copy = new RegExp(`<w:style\\b[^>]*w:styleId="${tblStyle}"[^>]*>[\\s\\S]*?</w:style>`).exec(styles)![0];
+    expect(copy).toContain('<w:name w:val="Table Grid (2)"/>');
+    expect(copy).toContain("<w:tblBorders>");
+    // Абзацы в таблице — интервалы стиля таблицы (0 / 240), а не умолчания СЗ (160 / 259).
+    const table = memo.slice(memo.indexOf("<w:tbl>"), memo.indexOf("</w:tbl>"));
+    expect(table).toMatch(/<w:spacing w:after="0" w:line="240" w:lineRule="auto"\/>/);
+    expect(table).not.toMatch(/w:after="160"/);
+  });
+
   it("неподдерживаемое содержимое — MergeError", () => {
     const zip = new PizZip(render(BUNDLES[0][1]));
     const xml = zip.file("word/document.xml")!.asText();

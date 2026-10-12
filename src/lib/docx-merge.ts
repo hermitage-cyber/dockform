@@ -64,7 +64,7 @@ const FONT_SLOTS = [
 
 type Attrs = Record<string, string>;
 type Props = { spacing: Attrs; sz?: string; szCs?: string; fonts: Attrs };
-type Style = { id: string; basedOn?: string; props: Props; xml: string };
+type Style = { id: string; type: string; isDefault: boolean; basedOn?: string; props: Props; xml: string };
 
 // ───────── Мини-разбор XML (документы Word предсказуемы, полный парсер не нужен) ─────────
 
@@ -228,11 +228,11 @@ function resolveFonts(fonts: Attrs, theme: Theme): Attrs {
 type PartStyles = {
   defaults: Props;
   byId: Map<string, Style>;
-  defaultParagraph?: string;
+  /// Стиль по умолчанию каждого типа: paragraph → «Normal», table → «Normal Table»…
+  defaultOf: Record<string, string>;
 };
 
-function readStyles(zip: PizZip): PartStyles {
-  const xml = zip.file("word/styles.xml")?.asText() ?? "";
+function parseStyles(xml: string): PartStyles {
   const dd = /<w:docDefaults>[\s\S]*?<\/w:docDefaults>/.exec(xml)?.[0] ?? "";
   const pPrDef = /<w:pPrDefault>[\s\S]*?<\/w:pPrDefault>/.exec(dd)?.[0];
   const rPrDef = /<w:rPrDefault>[\s\S]*?<\/w:rPrDefault>/.exec(dd)?.[0];
@@ -241,21 +241,78 @@ function readStyles(zip: PizZip): PartStyles {
     rPrDef ? /<w:rPr>[\s\S]*?<\/w:rPr>/.exec(rPrDef)?.[0] : undefined,
   );
   const byId = new Map<string, Style>();
-  let defaultParagraph: string | undefined;
+  const defaultOf: Record<string, string> = {};
   for (const m of xml.matchAll(/<w:style\b[^>]*>[\s\S]*?<\/w:style>/g)) {
     const el = m[0];
     const a = wAttrs(el);
     if (!a.styleId) continue;
     const based = child(el, "basedOn");
+    const isDefault = a.default === "1";
     byId.set(a.styleId, {
       id: a.styleId,
+      type: a.type ?? "paragraph",
+      isDefault,
       basedOn: based ? wAttrs(based).val : undefined,
       props: readProps(child(el, "pPr"), child(el, "rPr")),
       xml: el,
     });
-    if (a.type === "paragraph" && a.default === "1") defaultParagraph = a.styleId;
+    if (isDefault && a.type) defaultOf[a.type] = a.styleId;
   }
-  return { defaults, byId, defaultParagraph };
+  return { defaults, byId, defaultOf };
+}
+
+/// Стили части → стили общего файла. Идентификаторы стилей Word назначает сам
+/// («a3», «ad»), и в разных документах один и тот же id означает разное: у СЗ
+/// «a3» — «Сетка таблицы» с рамкой, у претензии — совсем другой стиль. Поэтому
+/// стиль части переносится под новым id, если у основы под этим id не он же.
+/// Стили по умолчанию («Normal» и т. п.) сводятся к стилям основы — то, что
+/// часть брала из своих, уже прописано в её абзацы (bakeElement).
+function mapStyles(
+  part: PartStyles,
+  base: PartStyles,
+  used: Iterable<string>,
+  n: number,
+): { map: Map<string, string>; added: string[] } {
+  const map = new Map<string, string>();
+  const added: string[] = [];
+  const taken = new Set(base.byId.keys());
+  const norm = (x: string) => x.replace(/<w:rsid\b[^>]*\/>/g, "").replace(/\s+/g, " ");
+  const resolve = (id: string): string => {
+    const known = map.get(id);
+    if (known) return known;
+    const s = part.byId.get(id);
+    if (!s) {
+      map.set(id, id);
+      return id;
+    }
+    if (s.isDefault) {
+      const d = base.defaultOf[s.type] ?? id;
+      map.set(id, d);
+      return d;
+    }
+    const b = base.byId.get(id);
+    if (b && norm(b.xml) === norm(s.xml)) {
+      map.set(id, id);
+      return id;
+    }
+    let newId = `${id}D${n}`;
+    while (taken.has(newId)) newId += "x";
+    taken.add(newId);
+    map.set(id, newId); // до рекурсии — на случай цикла basedOn
+    let xml = s.xml
+      .replace(/w:styleId="[^"]*"/, `w:styleId="${newId}"`)
+      .replace(/\sw:default="1"/, "")
+      .replace(/<w:name w:val="([^"]*)"\/>/, (_, nm: string) => `<w:name w:val="${nm} (${n})"/>`)
+      // Связанные стили не переносим: next/link тянули бы за собой лишнее.
+      .replace(/<w:(?:next|link)\b[^>]*\/>/g, "");
+    const based = /<w:basedOn w:val="([^"]*)"\/>/.exec(xml);
+    if (based) xml = xml.replace(based[0], `<w:basedOn w:val="${resolve(based[1])}"/>`);
+    if (!xml.includes('w:customStyle="1"')) xml = xml.replace(/^<w:style\b/, '<w:style w:customStyle="1"');
+    added.push(xml);
+    return newId;
+  };
+  for (const id of used) resolve(id);
+  return { map, added };
 }
 
 function styleChainProps(styles: PartStyles, id: string | undefined): Props {
@@ -281,15 +338,16 @@ function bakeRPr(rPr: string | undefined, eff: Props, theme: Theme): string {
   return el;
 }
 
-function bakeParagraph(p: string, styles: PartStyles, theme: Theme): string {
+function bakeParagraph(p: string, styles: PartStyles, theme: Theme, table: Props): string {
   if (p.endsWith("/>") && !p.includes("</")) p = `${p.slice(0, -2).trimEnd()}></w:p>`;
   const kids = topLevel(inner(p));
   const pPrIdx = kids.findIndex((k) => localName(k) === "pPr");
   let pPr = pPrIdx >= 0 ? kids[pPrIdx] : "<w:pPr></w:pPr>";
 
   const pStyleEl = child(pPr, "pStyle");
-  const pStyle = pStyleEl ? wAttrs(pStyleEl).val : styles.defaultParagraph;
-  const paraEff = overlay(styles.defaults, styleChainProps(styles, pStyle));
+  const pStyle = pStyleEl ? wAttrs(pStyleEl).val : styles.defaultOf.paragraph;
+  // Порядок по спецификации: умолчания документа → стиль таблицы → стиль абзаца.
+  const paraEff = overlay(overlay(styles.defaults, table), styleChainProps(styles, pStyle));
 
   // Интервалы: умолчания → стиль → прямое форматирование, итог — явно в абзац.
   const own = readProps(pPr, undefined).spacing;
@@ -332,14 +390,22 @@ function bakeParagraph(p: string, styles: PartStyles, theme: Theme): string {
   return openTag(p) + out.join("") + "</w:p>";
 }
 
-/// Все абзацы (в том числе в ячейках таблиц) — через обход дерева.
-function bakeElement(el: string, styles: PartStyles, theme: Theme): string {
+const NO_PROPS: Props = { spacing: {}, fonts: {} };
+
+/// Все абзацы (в том числе в ячейках таблиц) — через обход дерева. `table` —
+/// свойства стиля таблицы, в которой лежит абзац: он даёт им свои интервалы.
+function bakeElement(el: string, styles: PartStyles, theme: Theme, table: Props = NO_PROPS): string {
   const name = qname(el);
-  if (name === "w:p") return bakeParagraph(el, styles, theme);
+  if (name === "w:p") return bakeParagraph(el, styles, theme, table);
   if (el.endsWith("/>") && !el.includes("</")) return el;
   if (!["w:tbl", "w:tr", "w:tc", "w:sdt", "w:sdtContent", "w:customXml"].includes(name)) return el;
+  if (name === "w:tbl") {
+    const tblPr = child(el, "tblPr");
+    const st = tblPr && child(tblPr, "tblStyle");
+    table = styleChainProps(styles, st ? wAttrs(st).val : styles.defaultOf.table);
+  }
   const tag = openTag(el);
-  const ks = topLevel(inner(el)).map((k) => bakeElement(k, styles, theme));
+  const ks = topLevel(inner(el)).map((k) => bakeElement(k, styles, theme, table));
   return tag + ks.join("") + `</${tag.slice(1).split(/[\s>]/)[0]}>`;
 }
 
@@ -430,27 +496,23 @@ export function mergeDocx(parts: Uint8Array[]): Uint8Array {
       else if (existing !== v) throw new MergeError(`документ ${n}: конфликт пространств имён ${k}`);
     }
 
-    // Используемые стили, которых у основы нет, — переносим вместе с цепочкой basedOn.
-    const styles = readStyles(zip);
+    const styles = parseStyles(zip.file("word/styles.xml")?.asText() ?? "");
     const used = new Set<string>();
     for (const m of bodyXml.matchAll(/<w:(?:pStyle|rStyle|tblStyle) w:val="([^"]*)"/g)) used.add(m[1]);
-    const toCopy: string[] = [];
-    for (const id of used) {
-      for (let cur: string | undefined = id; cur; cur = styles.byId.get(cur)?.basedOn) {
-        if (baseStyles.includes(`w:styleId="${cur}"`) || toCopy.includes(cur)) break;
-        const s = styles.byId.get(cur);
-        if (!s) break;
-        toCopy.push(cur);
-      }
-    }
-    if (toCopy.length > 0) {
-      const add = toCopy.map((id) => styles.byId.get(id)!.xml).join("");
-      baseStyles = baseStyles.replace("</w:styles>", `${add}</w:styles>`);
-    }
+    const { map, added } = mapStyles(styles, parseStyles(baseStyles), used, n);
+    if (added.length > 0) baseStyles = baseStyles.replace("</w:styles>", `${added.join("")}</w:styles>`);
 
     const theme = readTheme(zip);
     const cleaned = doc.elements
       .map((el) => bakeElement(el, styles, theme))
+      // Ссылки на стили — на их копии в общем файле (после запекания: оно
+      // считает свойства по стилям самой части).
+      .map((el) =>
+        el.replace(
+          /(<w:(?:pStyle|rStyle|tblStyle) w:val=")([^"]*)(")/g,
+          (_, a: string, id: string, b: string) => `${a}${map.get(id) ?? id}${b}`,
+        ),
+      )
       // Закладки и w14-идентификаторы абзацев повторяются между документами —
       // Word считает такой файл повреждённым.
       .map((el) =>
