@@ -15,15 +15,15 @@ import {
 import { DynamicForm } from "@/components/DynamicForm";
 import { validateTemplate } from "@/lib/template-validator";
 import { formatValuesForDocx } from "@/lib/format-ru";
-import { FilenameFieldsError, generateBundle } from "@/lib/generator";
-import { deleteDraft, draftKey, openInExplorer, writeFile } from "@/lib/tauri";
+import { buildCombinedName, FilenameFieldsError, generateBundle } from "@/lib/generator";
+import { combineDocuments, deleteDraft, draftKey, openInExplorer, writeFile } from "@/lib/tauri";
 import type { FormValues } from "@/lib/form-evaluator";
 import type { Mode, TemplateConfig } from "@/types";
 
 /// Результат успешной записи: одиночный файл или связка в папке.
 type SavedResult =
   | { kind: "single"; path: string }
-  | { kind: "bundle"; dir: string; names: string[] };
+  | { kind: "bundle"; dir: string; names: string[]; combined?: boolean; warning?: string };
 
 type Props = {
   mode: Mode;
@@ -44,6 +44,8 @@ export function FormPage({ mode, template, onBack, onNewTemplate }: Props) {
   // Связка документов (этап 8.8): основной + extra_templates.
   const extraCount = template.extra_templates?.length ?? 0;
   const totalDocs = extraCount + 1;
+  // Один общий .docx + PDF вместо отдельных файлов (отзыв 2026-10-12).
+  const combined = totalDocs > 1 && !!template.combined_output;
 
   // Статическая проверка конфига при загрузке (этап 7.4): несогласованный
   // калькулятор / text_output блокирует форму понятной ошибкой, а не молча
@@ -63,9 +65,11 @@ export function FormPage({ mode, template, onBack, onNewTemplate }: Props) {
     //    показываем их и выходим; при битом плейсхолдере — бросит ниже, на диск
     //    ничего не попадёт.
     let files;
+    let combinedName: string | null = null;
     try {
       const docxValues = formatValuesForDocx(template, values);
       files = await generateBundle(mode, template, values, docxValues);
+      combinedName = buildCombinedName(template, values);
     } catch (e) {
       if (e instanceof FilenameFieldsError) {
         setMissing(e.missing);
@@ -81,11 +85,30 @@ export function FormPage({ mode, template, onBack, onNewTemplate }: Props) {
       if (totalDocs > 1) {
         const dir = await open({ directory: true });
         if (typeof dir !== "string") return; // отмена
+        // Общий файл собирает Word. Не вышло — сохраняем документы по
+        // отдельности, чтобы заполненная форма не пропала.
+        let warning: string | undefined;
+        if (combined && combinedName) {
+          try {
+            await combineDocuments(files.map((f) => f.bytes), dir, combinedName);
+            await deleteDraft(key).catch(() => undefined);
+            setSaved({
+              kind: "bundle",
+              dir,
+              names: [`${combinedName}.docx`, `${combinedName}.pdf`],
+              combined: true,
+            });
+            return;
+          } catch (e) {
+            const count = files.length === 3 ? "три" : String(files.length);
+            warning = `Не удалось собрать общий файл через Word: ${extractError(e)}. Сохранены ${count} отдельных документа.`;
+          }
+        }
         for (const f of files) {
           await writeFile(await join(dir, f.filename), f.bytes);
         }
         await deleteDraft(key).catch(() => undefined);
-        setSaved({ kind: "bundle", dir, names: files.map((f) => f.filename) });
+        setSaved({ kind: "bundle", dir, names: files.map((f) => f.filename), warning });
       } else {
         const dest = await save({
           defaultPath: files[0].filename,
@@ -152,7 +175,14 @@ export function FormPage({ mode, template, onBack, onNewTemplate }: Props) {
             onSubmit={onSubmit}
             disabled={busy}
             draftKey={key}
-            submitLabel={totalDocs > 1 ? `Сформировать ${totalDocs} документа` : undefined}
+            submitLabel={
+              combined
+                ? "Сформировать документ и PDF"
+                : totalDocs > 1
+                  ? `Сформировать ${totalDocs} документа`
+                  : undefined
+            }
+            busyLabel={combined ? "Формируем документ и PDF…" : undefined}
           />
         )}
       </div>
@@ -162,13 +192,20 @@ export function FormPage({ mode, template, onBack, onNewTemplate }: Props) {
           <DialogHeader>
             <DialogTitle>
               {saved?.kind === "bundle"
-                ? `Создано ${saved.names.length} файлов`
+                ? saved.combined
+                  ? "Документ и PDF сохранены"
+                  : `Создано ${saved.names.length} файлов`
                 : "Документ сохранён"}
             </DialogTitle>
             <DialogDescription className="break-all">
               {saved?.kind === "bundle" ? saved.dir : saved?.path}
             </DialogDescription>
           </DialogHeader>
+          {saved?.kind === "bundle" && saved.warning && (
+            <Alert variant="destructive">
+              <AlertDescription>{saved.warning}</AlertDescription>
+            </Alert>
+          )}
           {saved?.kind === "bundle" && (
             <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
               {saved.names.map((n) => (

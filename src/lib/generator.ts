@@ -27,6 +27,19 @@ export async function generateDocx(
 
 export type GeneratedFile = { filename: string; bytes: Uint8Array };
 
+/// Имя общего файла пакета (без расширения) по `combined_output`, или null,
+/// если у шаблона его нет. Пустые обязательные поля → FilenameFieldsError.
+export function buildCombinedName(
+  main: TemplateConfig,
+  filenameValues: Record<string, unknown>,
+): string | null {
+  const spec = main.combined_output;
+  if (!spec) return null;
+  const fn = buildFilename(spec.pattern, spec.fields ?? [], filenameValues);
+  if (!fn.ok) throw new FilenameFieldsError(fn.missing);
+  return fn.filename;
+}
+
 /// Ошибка сборки имени: не заполнены обязательные поля паттерна (хотя бы
 /// одного из документов связки). FormPage показывает их пользователю.
 export class FilenameFieldsError extends Error {

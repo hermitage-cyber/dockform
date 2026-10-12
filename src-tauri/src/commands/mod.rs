@@ -1,4 +1,5 @@
 pub mod app;
+pub mod combine;
 pub mod dictionaries;
 pub mod drafts;
 pub mod files;
