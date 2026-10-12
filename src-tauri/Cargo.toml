@@ -1,6 +1,6 @@
 [package]
 name = "dockform"
-version = "1.2.1"
+version = "1.2.2"
 description = "Dockform Portable — генератор юридических документов"
 authors = ["dockform"]
 edition = "2021"
