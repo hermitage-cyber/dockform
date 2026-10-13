@@ -78,9 +78,9 @@ export type TemplateConfig = {
   tags?: Record<string, string | number>;
   // Дополнительные документы из той же формы (этап 8.8).
   extra_templates?: ExtraTemplate[];
-  // Один общий .docx + PDF из всех документов пакета вместо отдельных файлов
-  // (отзыв 2026-10-12). pattern — имя без расширения. Собирает Word на машине
-  // оператора (Rust combine_documents); без Word — отдельные файлы, как раньше.
+  // Один общий .docx из всех документов пакета вместо отдельных файлов
+  // (отзыв 2026-10-12). pattern — имя без расширения. Склейка — src/lib/docx-merge.ts;
+  // не склеилось — отдельные файлы, как раньше.
   combined_output?: { pattern: string; fields?: string[] };
 };
 

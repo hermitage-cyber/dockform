@@ -36,12 +36,6 @@ export async function writeFile(path: string, bytes: Uint8Array): Promise<void> 
   await invoke("write_file", { path, bytes: Array.from(bytes) });
 }
 
-/// Сохраняет готовый .docx как `<outDir>/<baseName>.pdf` через Microsoft Word.
-/// Бросает строку-причину, если Word нет или он упал.
-export async function exportPdf(docx: Uint8Array, outDir: string, baseName: string): Promise<string> {
-  return await invoke("export_pdf", { docx: Array.from(docx), outDir, baseName });
-}
-
 export async function openInExplorer(path: string): Promise<void> {
   await invoke("open_in_explorer", { path });
 }

@@ -17,14 +17,14 @@ import { validateTemplate } from "@/lib/template-validator";
 import { formatValuesForDocx } from "@/lib/format-ru";
 import { buildCombinedName, FilenameFieldsError, generateBundle } from "@/lib/generator";
 import { mergeDocx } from "@/lib/docx-merge";
-import { deleteDraft, draftKey, exportPdf, openInExplorer, writeFile } from "@/lib/tauri";
+import { deleteDraft, draftKey, openInExplorer, writeFile } from "@/lib/tauri";
 import type { FormValues } from "@/lib/form-evaluator";
 import type { Mode, TemplateConfig } from "@/types";
 
 /// Результат успешной записи: одиночный файл или связка в папке.
 type SavedResult =
   | { kind: "single"; path: string }
-  | { kind: "bundle"; dir: string; names: string[]; combined?: boolean; warning?: string };
+  | { kind: "bundle"; dir: string; names: string[]; warning?: string };
 
 type Props = {
   mode: Mode;
@@ -45,7 +45,7 @@ export function FormPage({ mode, template, onBack, onNewTemplate }: Props) {
   // Связка документов (этап 8.8): основной + extra_templates.
   const extraCount = template.extra_templates?.length ?? 0;
   const totalDocs = extraCount + 1;
-  // Один общий .docx + PDF вместо отдельных файлов (отзыв 2026-10-12).
+  // Один общий .docx вместо отдельных файлов (отзыв 2026-10-12).
   const combined = totalDocs > 1 && !!template.combined_output;
 
   // Статическая проверка конфига при загрузке (этап 7.4): несогласованный
@@ -86,8 +86,9 @@ export function FormPage({ mode, template, onBack, onNewTemplate }: Props) {
       if (totalDocs > 1) {
         const dir = await open({ directory: true });
         if (typeof dir !== "string") return; // отмена
-        // Общий .docx склеиваем сами, PDF печатает Word. Не склеилось —
-        // сохраняем документы по отдельности; нет PDF — общий .docx всё равно сохранён.
+        // Общий .docx склеиваем сами. Не склеилось — сохраняем документы по
+        // отдельности, чтобы заполненная форма не пропала.
+        // PDF через Word был и убран: у пилота Word зависал (таймаут 120 с).
         let warning: string | undefined;
         if (combined && combinedName) {
           let merged: Uint8Array | null = null;
@@ -98,16 +99,10 @@ export function FormPage({ mode, template, onBack, onNewTemplate }: Props) {
             warning = `Не удалось собрать общий файл: ${extractError(e)}. Сохранены ${count} отдельных документа.`;
           }
           if (merged) {
-            await writeFile(await join(dir, `${combinedName}.docx`), merged);
-            const names = [`${combinedName}.docx`];
-            try {
-              await exportPdf(merged, dir, combinedName);
-              names.push(`${combinedName}.pdf`);
-            } catch (e) {
-              warning = `Не удалось сохранить PDF через Word: ${extractError(e)}. Общий документ .docx сохранён.`;
-            }
+            const path = await join(dir, `${combinedName}.docx`);
+            await writeFile(path, merged);
             await deleteDraft(key).catch(() => undefined);
-            setSaved({ kind: "bundle", dir, names, combined: true, warning });
+            setSaved({ kind: "single", path });
             return;
           }
         }
@@ -182,14 +177,7 @@ export function FormPage({ mode, template, onBack, onNewTemplate }: Props) {
             onSubmit={onSubmit}
             disabled={busy}
             draftKey={key}
-            submitLabel={
-              combined
-                ? "Сформировать документ и PDF"
-                : totalDocs > 1
-                  ? `Сформировать ${totalDocs} документа`
-                  : undefined
-            }
-            busyLabel={combined ? "Формируем документ и PDF…" : undefined}
+            submitLabel={!combined && totalDocs > 1 ? `Сформировать ${totalDocs} документа` : undefined}
           />
         )}
       </div>
@@ -198,13 +186,7 @@ export function FormPage({ mode, template, onBack, onNewTemplate }: Props) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {saved?.kind === "bundle"
-                ? saved.combined
-                  ? saved.names.length > 1
-                    ? "Документ и PDF сохранены"
-                    : "Документ сохранён"
-                  : `Создано ${saved.names.length} файлов`
-                : "Документ сохранён"}
+              {saved?.kind === "bundle" ? `Создано ${saved.names.length} файлов` : "Документ сохранён"}
             </DialogTitle>
             <DialogDescription className="break-all">
               {saved?.kind === "bundle" ? saved.dir : saved?.path}

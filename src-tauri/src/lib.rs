@@ -7,7 +7,6 @@ use commands::files::{open_in_explorer, read_template, write_file};
 use commands::holidays::read_holidays;
 use commands::manifest::update_templates;
 use commands::network::fetch_killswitch;
-use commands::pdf::export_pdf;
 use commands::shortcuts::remove_legacy_shortcuts;
 use commands::templates::list_templates;
 use commands::window::{load_window_state, save_window_state};
@@ -81,7 +80,6 @@ pub fn run() {
             read_template,
             write_file,
             open_in_explorer,
-            export_pdf,
             save_window_state,
             load_window_state,
             save_draft,

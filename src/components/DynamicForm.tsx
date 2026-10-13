@@ -35,14 +35,12 @@ type Props = {
   draftKey?: string;
   /// Подпись кнопки отправки (по умолчанию «Сформировать документ»).
   submitLabel?: string;
-  /// Подпись кнопки, пока форма заблокирована (по умолчанию «Формируем…»).
-  busyLabel?: string;
 };
 
 const requiredMsg = "Обязательное поле";
 const DEBOUNCE_MS = 500;
 
-export function DynamicForm({ config, onSubmit, disabled, draftKey, submitLabel, busyLabel }: Props) {
+export function DynamicForm({ config, onSubmit, disabled, draftKey, submitLabel }: Props) {
   const {
     register,
     handleSubmit,
@@ -242,7 +240,7 @@ export function DynamicForm({ config, onSubmit, disabled, draftKey, submitLabel,
         })}
 
         <Button type="submit" disabled={disabled || draftFound !== null}>
-          {disabled ? (busyLabel ?? "Формируем…") : (submitLabel ?? "Сформировать документ")}
+          {disabled ? "Формируем…" : (submitLabel ?? "Сформировать документ")}
         </Button>
       </form>
     </>
