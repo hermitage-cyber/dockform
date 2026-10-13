@@ -644,7 +644,7 @@ dependencies = [
 
 [[package]]
 name = "dockform"
-version = "1.2.2"
+version = "1.2.3"
 dependencies = [
  "hex",
  "reqwest 0.12.28",
